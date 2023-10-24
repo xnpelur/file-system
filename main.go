@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/binary"
+	"file-system/superblock"
 	"log"
 	"os"
 )
@@ -12,20 +12,6 @@ const (
 	blockCountOffset  = 6
 )
 
-func writeUint16ToFile(file *os.File, offset int, value uint16) error {
-	b := make([]byte, 2)
-	binary.LittleEndian.PutUint16(b, value)
-	_, err := file.WriteAt(b, int64(offset))
-	return err
-}
-
-func writeUint32ToFile(file *os.File, offset int, value uint32) error {
-	b := make([]byte, 4)
-	binary.LittleEndian.PutUint32(b, value)
-	_, err := file.WriteAt(b, int64(offset))
-	return err
-}
-
 func createFileSystem() error {
 	file, err := os.Create("data")
 	if err != nil {
@@ -33,20 +19,17 @@ func createFileSystem() error {
 	}
 	defer file.Close()
 
-	// Make this struct later...
-	magicNumber := uint16(13)
-	inodeCount := uint32(100)
-	blockCount := uint32(200)
+	sb := superblock.NewSuperblock(
+		100,
+		200,
+		300,
+		400,
+		500,
+		600,
+	)
 
-	if err := writeUint16ToFile(file, magicNumberOffset, magicNumber); err != nil {
-		return err
-	}
-
-	if err := writeUint32ToFile(file, inodeCountOffset, inodeCount); err != nil {
-		return err
-	}
-
-	if err := writeUint32ToFile(file, blockCountOffset, blockCount); err != nil {
+	err = superblock.WriteSuperBlockToFile(file, 0, sb)
+	if err != nil {
 		return err
 	}
 
