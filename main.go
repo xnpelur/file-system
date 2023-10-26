@@ -1,6 +1,7 @@
 package main
 
 import (
+	"file-system/bitmap"
 	"file-system/superblock"
 	"log"
 	"os"
@@ -29,6 +30,19 @@ func createFileSystem() error {
 	)
 
 	err = superblock.WriteSuperBlockToFile(file, 0, sb)
+	if err != nil {
+		return err
+	}
+
+	bm := bitmap.NewBitmap(16)
+	bm.SetBit(1, 1)
+	bm.SetBit(3, 1)
+	bm.SetBit(5, 1)
+	bm.SetBit(6, 1)
+	bm.SetBit(6, 0)
+	bm.SetBit(7, 1)
+
+	err = bitmap.WriteBitmapToFile(file, 26, *bm)
 	if err != nil {
 		return err
 	}
