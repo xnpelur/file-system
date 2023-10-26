@@ -7,12 +7,6 @@ import (
 	"os"
 )
 
-const (
-	magicNumberOffset = 0
-	inodeCountOffset  = 2
-	blockCountOffset  = 6
-)
-
 func createFileSystem() error {
 	file, err := os.Create("data")
 	if err != nil {
