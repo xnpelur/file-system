@@ -34,15 +34,28 @@ func createFileSystem() error {
 		return err
 	}
 
-	bm := bitmap.NewBitmap(16)
-	bm.SetBit(1, 1)
-	bm.SetBit(3, 1)
-	bm.SetBit(5, 1)
-	bm.SetBit(6, 1)
-	bm.SetBit(6, 0)
-	bm.SetBit(7, 1)
+	blockBitmap := bitmap.NewBitmap(16)
+	blockBitmap.SetBit(1, 1)
+	blockBitmap.SetBit(3, 1)
+	blockBitmap.SetBit(5, 1)
+	blockBitmap.SetBit(6, 1)
+	blockBitmap.SetBit(6, 0)
+	blockBitmap.SetBit(7, 1)
 
-	err = bitmap.WriteBitmapToFile(file, 26, *bm)
+	err = bitmap.WriteBitmapToFile(file, 26, *blockBitmap)
+	if err != nil {
+		return err
+	}
+
+	inodeBitmap := bitmap.NewBitmap(16)
+	inodeBitmap.SetBit(0, 1)
+	inodeBitmap.SetBit(2, 1)
+	inodeBitmap.SetBit(4, 1)
+	inodeBitmap.SetBit(8, 1)
+	inodeBitmap.SetBit(10, 1)
+	inodeBitmap.SetBit(16, 1)
+
+	err = bitmap.WriteBitmapToFile(file, 26+2, *inodeBitmap)
 	if err != nil {
 		return err
 	}
