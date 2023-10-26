@@ -8,7 +8,7 @@ import (
 )
 
 func createFileSystem() error {
-	file, err := os.Create("data")
+	file, err := os.Create("filesystem.data")
 	if err != nil {
 		return err
 	}
