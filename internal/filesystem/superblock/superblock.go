@@ -26,7 +26,6 @@ func NewSuperblock(filesystemSizeInBytes, blockSize uint32) Superblock {
 	s := Superblock{}
 
 	blockCount := filesystemSizeInBytes / blockSize
-	inodeDummy := inode.Inode{}
 
 	s.MagicNumber = 0x1234
 	s.BlockCount = blockCount
@@ -34,7 +33,7 @@ func NewSuperblock(filesystemSizeInBytes, blockSize uint32) Superblock {
 	s.FreeBlockCount = blockCount
 	s.FreeInodeCount = blockCount
 	s.BlockSize = blockSize
-	s.InodeSize = uint32(binary.Size(inodeDummy))
+	s.InodeSize = uint32(inode.GetInodeSize())
 
 	return s
 }

@@ -1,5 +1,9 @@
 package inode
 
+import (
+	"file-system/internal/utils"
+)
+
 type Inode struct {
 	TypeAndPermissions uint16
 	UserId             uint16
@@ -24,8 +28,10 @@ type TypeAndPermissions struct {
 	UsersExecuteAccess bool
 }
 
-func NewInode() Inode {
-	return Inode{}
+func GetInodeSize() int {
+	inodeDummy := Inode{}
+	size, _ := utils.CalculateStructSize(inodeDummy)
+	return size
 }
 
 func UnpackTypeAndPermissions(value uint16) TypeAndPermissions {
