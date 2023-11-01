@@ -36,5 +36,18 @@ func FormatFilesystem(sizeInBytes int, blockSize int) error {
 	inodeTableSize, _ := inode.WriteInodeTable(file, offset, int(superblockInstance.InodeCount))
 	offset += inodeTableSize
 
+	WriteInfoBlock(file, offset, sizeInBytes)
+
+	return nil
+}
+
+func WriteInfoBlock(file *os.File, offset int, size int) error {
+	data := make([]byte, size)
+
+	_, err := file.WriteAt(data, int64(offset))
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
