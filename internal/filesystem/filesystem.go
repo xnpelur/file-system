@@ -2,6 +2,7 @@ package filesystem
 
 import (
 	"file-system/internal/filesystem/bitmap"
+	"file-system/internal/filesystem/inode"
 	"file-system/internal/filesystem/superblock"
 	"os"
 )
@@ -15,24 +16,25 @@ func FormatFilesystem(sizeInBytes int, blockSize int) error {
 
 	superblockInstance := superblock.NewSuperblock(uint32(sizeInBytes), uint32(blockSize))
 
-	err = superblock.WriteSuperBlockToFile(file, 0, superblockInstance)
-	if err != nil {
-		return err
-	}
+	offset := 0
+
+	superblock.WriteSuperBlockToFile(file, offset, superblockInstance)
+	offset += superblockInstance.Size()
 
 	blockBitmap := bitmap.NewBitmap(superblockInstance.BlockCount)
+	blockBitmap.SetBit(0, 1)
 
-	err = bitmap.WriteBitmapToFile(file, superblockInstance.Size(), *blockBitmap)
-	if err != nil {
-		return err
-	}
+	bitmap.WriteBitmapToFile(file, offset, *blockBitmap)
+	offset += int(blockBitmap.Size)
 
 	inodeBitmap := bitmap.NewBitmap(superblockInstance.InodeCount)
+	inodeBitmap.SetBit(0, 1)
 
-	err = bitmap.WriteBitmapToFile(file, superblockInstance.Size()+int(blockBitmap.Size), *inodeBitmap)
-	if err != nil {
-		return err
-	}
+	bitmap.WriteBitmapToFile(file, offset, *inodeBitmap)
+	offset += int(inodeBitmap.Size)
+
+	inodeTableSize, _ := inode.WriteInodeTable(file, offset, int(superblockInstance.InodeCount))
+	offset += int(inodeTableSize)
 
 	return nil
 }

@@ -2,6 +2,7 @@ package inode
 
 import (
 	"file-system/internal/utils"
+	"os"
 )
 
 type Inode struct {
@@ -83,4 +84,17 @@ func PackTypeAndPermissions(typeAndPermissions TypeAndPermissions) uint16 {
 	}
 
 	return value
+}
+
+func WriteInodeTable(file *os.File, offset int, inodeCount int) (int, error) {
+	inodeSize := GetInodeSize()
+	tableSize := inodeSize * inodeCount
+	data := make([]byte, tableSize)
+
+	_, err := file.WriteAt(data, int64(offset))
+	if err != nil {
+		return 0, err
+	}
+
+	return tableSize, nil
 }
