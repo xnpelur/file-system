@@ -34,7 +34,7 @@ func FormatFilesystem(sizeInBytes int, blockSize int) error {
 	offset += int(inodeBitmap.Size)
 
 	inodeTableSize, _ := inode.WriteInodeTable(file, offset, int(superblockInstance.InodeCount))
-	offset += int(inodeTableSize)
+	offset += inodeTableSize
 
 	return nil
 }
