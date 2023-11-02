@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	err := filesystem.FormatFilesystem(1*1024*1024, 1024) // 1Mb - filesystem, 1kb - block
+	_, err := filesystem.FormatFilesystem(1*1024*1024, 1024) // 1Mb - filesystem, 1kb - block
 	if err != nil {
 		log.Fatal(err)
 	}

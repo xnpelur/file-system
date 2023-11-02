@@ -22,7 +22,7 @@ func (s Superblock) Size() int {
 	return size
 }
 
-func NewSuperblock(filesystemSizeInBytes, blockSize uint32) Superblock {
+func NewSuperblock(filesystemSizeInBytes, blockSize uint32) *Superblock {
 	s := Superblock{}
 
 	blockCount := filesystemSizeInBytes / blockSize
@@ -35,7 +35,7 @@ func NewSuperblock(filesystemSizeInBytes, blockSize uint32) Superblock {
 	s.BlockSize = blockSize
 	s.InodeSize = uint32(inode.GetInodeSize())
 
-	return s
+	return &s
 }
 
 func WriteSuperBlockToFile(file *os.File, offset int, value Superblock) error {
