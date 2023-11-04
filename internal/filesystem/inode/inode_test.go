@@ -1,6 +1,7 @@
 package inode
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -55,5 +56,56 @@ func TestConversionRoundTrip(t *testing.T) {
 		if converted != original {
 			t.Errorf("Conversion round trip failed for %v, got %v", original, converted)
 		}
+	}
+}
+
+func TestNewTypeAndPermissions(t *testing.T) {
+	testCases := []struct {
+		isFile              bool
+		numericPermissions  int
+		expectedPermissions TypeAndPermissions
+	}{
+		{
+			isFile:             true,
+			numericPermissions: 755,
+			expectedPermissions: TypeAndPermissions{
+				IsFile:             true,
+				OwnerReadAccess:    true,
+				OwnerWriteAccess:   true,
+				OwnerExecuteAccess: true,
+				GroupReadAccess:    true,
+				GroupWriteAccess:   false,
+				GroupExecuteAccess: true,
+				UsersReadAccess:    true,
+				UsersWriteAccess:   false,
+				UsersExecuteAccess: true,
+			},
+		},
+		{
+			isFile:             false,
+			numericPermissions: 644,
+			expectedPermissions: TypeAndPermissions{
+				IsFile:             false,
+				OwnerReadAccess:    true,
+				OwnerWriteAccess:   true,
+				OwnerExecuteAccess: false,
+				GroupReadAccess:    true,
+				GroupWriteAccess:   false,
+				GroupExecuteAccess: false,
+				UsersReadAccess:    true,
+				UsersWriteAccess:   false,
+				UsersExecuteAccess: false,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("isFile=%v, numericPermissions=%d", tc.isFile, tc.numericPermissions), func(t *testing.T) {
+			actualPermissions := NewTypeAndPermissions(tc.isFile, tc.numericPermissions)
+
+			if actualPermissions != tc.expectedPermissions {
+				t.Errorf("Expected %+v, but got %+v", tc.expectedPermissions, actualPermissions)
+			}
+		})
 	}
 }

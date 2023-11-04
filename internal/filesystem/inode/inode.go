@@ -29,6 +29,39 @@ type TypeAndPermissions struct {
 	UsersExecuteAccess bool
 }
 
+func NewInode(
+	isFile bool,
+	numericPermissions int,
+	userId int,
+	groupId int,
+	fileSize int,
+) Inode {
+	return Inode{
+		TypeAndPermissions: PackTypeAndPermissions(NewTypeAndPermissions(isFile, numericPermissions)),
+		UserId:             uint16(userId),
+		GroupId:            uint16(groupId),
+		FileSize:           uint32(fileSize),
+	}
+}
+
+func NewTypeAndPermissions(isFile bool, numericPermissions int) TypeAndPermissions {
+	users := numericPermissions % 10
+	group := numericPermissions / 10 % 10
+	owner := numericPermissions / 100 % 10
+	return TypeAndPermissions{
+		IsFile:             isFile,
+		OwnerReadAccess:    (owner>>2)&1 == 1,
+		OwnerWriteAccess:   (owner>>1)&1 == 1,
+		OwnerExecuteAccess: (owner>>0)&1 == 1,
+		GroupReadAccess:    (group>>2)&1 == 1,
+		GroupWriteAccess:   (group>>1)&1 == 1,
+		GroupExecuteAccess: (group>>0)&1 == 1,
+		UsersReadAccess:    (users>>2)&1 == 1,
+		UsersWriteAccess:   (users>>1)&1 == 1,
+		UsersExecuteAccess: (users>>0)&1 == 1,
+	}
+}
+
 func GetInodeSize() int {
 	inodeDummy := Inode{}
 	size, _ := utils.CalculateStructSize(inodeDummy)
@@ -86,15 +119,6 @@ func PackTypeAndPermissions(typeAndPermissions TypeAndPermissions) uint16 {
 	return value
 }
 
-func WriteInodeTable(file *os.File, offset int, inodeCount int) (int, error) {
-	inodeSize := GetInodeSize()
-	tableSize := inodeSize * inodeCount
-	data := make([]byte, tableSize)
-
-	_, err := file.WriteAt(data, int64(offset))
-	if err != nil {
-		return 0, err
-	}
-
-	return tableSize, nil
+func (i Inode) WriteToFile(file *os.File, inodeTableOffset int, inodeIndex int) {
+	panic("[Inode.WriteToFile(...)] - not implemented yet!")
 }

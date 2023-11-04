@@ -36,17 +36,15 @@ func FormatFilesystem(sizeInBytes int, blockSize int) (*FileSystem, error) {
 	bitmap.WriteBitmapToFile(file, offset, *fileSystem.InodeBitmap)
 	offset += int(fileSystem.InodeBitmap.Size)
 
-	inodeTableSize, _ := inode.WriteInodeTable(file, offset, int(fileSystem.Superblock.InodeCount))
-	offset += inodeTableSize
+	inodeTableSize := fileSystem.Superblock.InodeCount * uint32(inode.GetInodeSize())
+	ReserveSpaceInFile(file, offset, inodeTableSize+uint32(sizeInBytes))
 
-	WriteInfoBlock(file, offset, sizeInBytes)
-
-	fileSystem.CreateRootDirectory()
+	fileSystem.CreateRootDirectory(file, offset)
 
 	return &fileSystem, nil
 }
 
-func WriteInfoBlock(file *os.File, offset int, size int) error {
+func ReserveSpaceInFile(file *os.File, offset int, size uint32) error {
 	data := make([]byte, size)
 
 	_, err := file.WriteAt(data, int64(offset))
@@ -57,7 +55,10 @@ func WriteInfoBlock(file *os.File, offset int, size int) error {
 	return nil
 }
 
-func (fs FileSystem) CreateRootDirectory() {
+func (fs FileSystem) CreateRootDirectory(file *os.File, inodeTableOffset int) {
 	fs.InodeBitmap.SetBit(0, 1)
 	fs.BlockBitmap.SetBit(0, 1)
+
+	rootInode := inode.NewInode(false, 000, 0, 0, 1024)
+	rootInode.WriteToFile(file, inodeTableOffset, 0)
 }
