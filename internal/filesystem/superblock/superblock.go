@@ -17,11 +17,6 @@ type Superblock struct {
 	InodeSize      uint32
 }
 
-func (s Superblock) Size() int {
-	size, _ := utils.CalculateStructSize(s)
-	return size
-}
-
 func NewSuperblock(filesystemSizeInBytes, blockSize uint32) *Superblock {
 	s := Superblock{}
 
@@ -38,8 +33,13 @@ func NewSuperblock(filesystemSizeInBytes, blockSize uint32) *Superblock {
 	return &s
 }
 
-func WriteSuperBlockToFile(file *os.File, offset int, value Superblock) error {
-	data := encodeSuperblock(value)
+func (s Superblock) Size() int {
+	size, _ := utils.CalculateStructSize(s)
+	return size
+}
+
+func (s Superblock) WriteToFile(file *os.File, offset int) error {
+	data := encodeSuperblock(s)
 
 	_, err := file.WriteAt(data, int64(offset))
 	if err != nil {

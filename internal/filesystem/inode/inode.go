@@ -35,13 +35,21 @@ func NewInode(
 	numericPermissions int,
 	userId int,
 	groupId int,
-	fileSize int,
+	dataBlocks []uint32,
 ) Inode {
+	var fileData [12]uint32
+	for i, dataBlock := range dataBlocks {
+		if i >= 12 {
+			break
+		}
+		fileData[i] = dataBlock
+	}
 	return Inode{
 		TypeAndPermissions: PackTypeAndPermissions(NewTypeAndPermissions(isFile, numericPermissions)),
 		UserId:             uint16(userId),
 		GroupId:            uint16(groupId),
-		FileSize:           uint32(fileSize),
+		FileSize:           uint32(len(dataBlocks)),
+		FileData:           fileData,
 	}
 }
 
@@ -122,7 +130,7 @@ func PackTypeAndPermissions(typeAndPermissions TypeAndPermissions) uint16 {
 
 func (inode Inode) WriteToFile(file *os.File, inodeTableOffset int, inodeIndex int) error {
 	offset := inodeTableOffset + inodeIndex*GetInodeSize()
-	data := encodeInode(inode)
+	data := inode.encode()
 
 	_, err := file.WriteAt(data, int64(offset))
 	if err != nil {
@@ -132,7 +140,7 @@ func (inode Inode) WriteToFile(file *os.File, inodeTableOffset int, inodeIndex i
 	return nil
 }
 
-func encodeInode(value Inode) []byte {
+func (value Inode) encode() []byte {
 	data := make([]byte, 68)
 
 	binary.BigEndian.PutUint16(data[0:2], value.TypeAndPermissions)

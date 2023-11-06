@@ -2,6 +2,7 @@ package filesystem
 
 import (
 	"file-system/internal/filesystem/bitmap"
+	"file-system/internal/filesystem/directory"
 	"file-system/internal/filesystem/inode"
 	"file-system/internal/filesystem/superblock"
 	"os"
@@ -26,11 +27,11 @@ func FormatFilesystem(sizeInBytes int, blockSize int) (*FileSystem, error) {
 		return nil, err
 	}
 
-	superblock.WriteSuperBlockToFile(fileSystem.dataFile, 0, *fileSystem.Superblock)
+	fileSystem.Superblock.WriteToFile(fileSystem.dataFile, 0)
 	fileSystem.BlockBitmap.WriteToFile(fileSystem.dataFile, fileSystem.GetBlockBitmapOffset())
 	fileSystem.InodeBitmap.WriteToFile(fileSystem.dataFile, fileSystem.GetInodeBitmapOffset())
 
-	inodeTableSize := fileSystem.Superblock.InodeCount * uint32(inode.GetInodeSize())
+	inodeTableSize := fileSystem.Superblock.InodeCount * fileSystem.Superblock.InodeSize
 	fileSystem.ReserveSpaceInFile(fileSystem.GetInodeTableOffset(), inodeTableSize+uint32(sizeInBytes))
 
 	fileSystem.CreateRootDirectory()
@@ -50,14 +51,20 @@ func (fs FileSystem) ReserveSpaceInFile(offset int, size uint32) error {
 }
 
 func (fs FileSystem) CreateRootDirectory() {
-	fs.InodeBitmap.SetBit(0, 1)
 	fs.BlockBitmap.SetBit(0, 1)
+	fs.InodeBitmap.SetBit(0, 1)
 
+	fs.Superblock.FreeBlockCount--
+	fs.Superblock.FreeInodeCount--
+
+	rootInode := inode.NewInode(false, 000, 0, 0, []uint32{0})
+	rootDir := directory.CreateNewDirectory(0, 0)
+
+	fs.Superblock.WriteToFile(fs.dataFile, 0)
 	fs.BlockBitmap.WriteToFile(fs.dataFile, fs.GetBlockBitmapOffset())
 	fs.InodeBitmap.WriteToFile(fs.dataFile, fs.GetInodeBitmapOffset())
-
-	rootInode := inode.NewInode(false, 000, 0, 0, 1024)
 	rootInode.WriteToFile(fs.dataFile, fs.GetInodeTableOffset(), 0)
+	rootDir.WriteToFile(fs.dataFile, fs.GetDataBlocksOffset())
 }
 
 func (fs FileSystem) GetBlockBitmapOffset() int {
@@ -70,6 +77,10 @@ func (fs FileSystem) GetInodeBitmapOffset() int {
 
 func (fs FileSystem) GetInodeTableOffset() int {
 	return fs.GetInodeBitmapOffset() + int(fs.InodeBitmap.Size)
+}
+
+func (fs FileSystem) GetDataBlocksOffset() int {
+	return fs.GetInodeTableOffset() + int(fs.Superblock.InodeCount*fs.Superblock.InodeSize)
 }
 
 func (fs FileSystem) CloseDataFile() error {
