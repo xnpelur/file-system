@@ -37,9 +37,26 @@ func (b *Bitmap) GetBit(index int) (int, error) {
 	if index < 0 || index >= int(b.Size) {
 		return 0, errors.New("index out of bounds")
 	}
-	byteIndex, bitOffset := index/8, uint(index%8)
+	byteIndex, bitOffset := index/8, uint(7-index%8)
 
 	return int((b.Data[byteIndex] >> bitOffset) & 1), nil
+}
+
+func (b *Bitmap) TakeFreeBit() (int, error) {
+	for i := 0; i < int(b.Size); i++ {
+		bit, err := b.GetBit(i)
+		if err != nil {
+			return 0, err
+		}
+		if bit == 0 {
+			err := b.SetBit(i, 1)
+			if err != nil {
+				return 0, err
+			}
+			return i, nil
+		}
+	}
+	return 0, errors.New("no zero bits found")
 }
 
 func (b *Bitmap) ToByteArray() []byte {

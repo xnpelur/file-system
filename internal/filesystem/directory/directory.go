@@ -24,8 +24,8 @@ func ParseDirectoryFromBlock() Directory {
 	return Directory{}
 }
 
-func (d Directory) AddFile() {
-
+func (d *Directory) AddFile(inode uint32, name string) {
+	d.Records = append(d.Records, record.NewRecord(inode, name))
 }
 
 func (d Directory) WriteAt(file *os.File, offset int) error {

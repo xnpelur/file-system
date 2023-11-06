@@ -68,6 +68,29 @@ func (fs FileSystem) CreateRootDirectory() {
 	rootDir.WriteAt(fs.dataFile, fs.GetDataBlocksOffset())
 
 	fs.currentDirectory = rootDir
+	fs.CreateFirstFile("hello.txt")
+}
+
+func (fs FileSystem) CreateFirstFile(name string) error {
+	blockIndex, err := fs.BlockBitmap.TakeFreeBit()
+	if err != nil {
+		return err
+	}
+	fs.Superblock.FreeBlockCount--
+
+	inodeIndex, err := fs.InodeBitmap.TakeFreeBit()
+	if err != nil {
+		return err
+	}
+	fs.Superblock.FreeInodeCount--
+
+	fileInode := inode.NewInode(true, 777, 0, 0, []uint32{uint32(blockIndex)})
+	inodeOffset := fs.GetInodeTableOffset() + int(fs.Superblock.InodeSize)*inodeIndex
+	fileInode.WriteAt(fs.dataFile, inodeOffset)
+
+	fs.currentDirectory.AddFile(uint32(inodeIndex), name)
+
+	return nil
 }
 
 func (fs FileSystem) GetBlockBitmapOffset() int {
