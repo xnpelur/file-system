@@ -63,7 +63,7 @@ func (fs FileSystem) CreateRootDirectory() {
 	fs.Superblock.WriteToFile(fs.dataFile, 0)
 	fs.BlockBitmap.WriteToFile(fs.dataFile, fs.GetBlockBitmapOffset())
 	fs.InodeBitmap.WriteToFile(fs.dataFile, fs.GetInodeBitmapOffset())
-	rootInode.WriteToFile(fs.dataFile, fs.GetInodeTableOffset(), 0)
+	rootInode.WriteToFile(fs.dataFile, fs.GetInodeTableOffset())
 	rootDir.WriteToFile(fs.dataFile, fs.GetDataBlocksOffset())
 }
 
