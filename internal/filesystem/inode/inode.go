@@ -128,7 +128,7 @@ func PackTypeAndPermissions(typeAndPermissions TypeAndPermissions) uint16 {
 	return value
 }
 
-func (inode Inode) WriteToFile(file *os.File, offset int) error {
+func (inode Inode) WriteAt(file *os.File, offset int) error {
 	data := inode.encode()
 
 	_, err := file.WriteAt(data, int64(offset))

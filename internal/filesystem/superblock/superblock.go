@@ -38,7 +38,7 @@ func (s Superblock) Size() int {
 	return size
 }
 
-func (s Superblock) WriteToFile(file *os.File, offset int) error {
+func (s Superblock) WriteAt(file *os.File, offset int) error {
 	data := encodeSuperblock(s)
 
 	_, err := file.WriteAt(data, int64(offset))

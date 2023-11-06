@@ -24,9 +24,13 @@ func ParseDirectoryFromBlock() Directory {
 	return Directory{}
 }
 
-func (d Directory) WriteToFile(file *os.File, offset int) error {
+func (d Directory) AddFile() {
+
+}
+
+func (d Directory) WriteAt(file *os.File, offset int) error {
 	for _, rec := range d.Records {
-		err := rec.WriteToFile(file, offset)
+		err := rec.WriteAt(file, offset)
 		if err != nil {
 			return err
 		}

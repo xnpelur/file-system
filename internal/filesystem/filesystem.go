@@ -9,10 +9,11 @@ import (
 )
 
 type FileSystem struct {
-	Superblock  *superblock.Superblock
-	BlockBitmap *bitmap.Bitmap
-	InodeBitmap *bitmap.Bitmap
-	dataFile    *os.File
+	Superblock       *superblock.Superblock
+	BlockBitmap      *bitmap.Bitmap
+	InodeBitmap      *bitmap.Bitmap
+	dataFile         *os.File
+	currentDirectory directory.Directory
 }
 
 func FormatFilesystem(sizeInBytes int, blockSize int) (*FileSystem, error) {
@@ -27,9 +28,9 @@ func FormatFilesystem(sizeInBytes int, blockSize int) (*FileSystem, error) {
 		return nil, err
 	}
 
-	fileSystem.Superblock.WriteToFile(fileSystem.dataFile, 0)
-	fileSystem.BlockBitmap.WriteToFile(fileSystem.dataFile, fileSystem.GetBlockBitmapOffset())
-	fileSystem.InodeBitmap.WriteToFile(fileSystem.dataFile, fileSystem.GetInodeBitmapOffset())
+	fileSystem.Superblock.WriteAt(fileSystem.dataFile, 0)
+	fileSystem.BlockBitmap.WriteAt(fileSystem.dataFile, fileSystem.GetBlockBitmapOffset())
+	fileSystem.InodeBitmap.WriteAt(fileSystem.dataFile, fileSystem.GetInodeBitmapOffset())
 
 	inodeTableSize := fileSystem.Superblock.InodeCount * fileSystem.Superblock.InodeSize
 	fileSystem.ReserveSpaceInFile(fileSystem.GetInodeTableOffset(), inodeTableSize+uint32(sizeInBytes))
@@ -60,11 +61,13 @@ func (fs FileSystem) CreateRootDirectory() {
 	rootInode := inode.NewInode(false, 000, 0, 0, []uint32{0})
 	rootDir := directory.CreateNewDirectory(0, 0)
 
-	fs.Superblock.WriteToFile(fs.dataFile, 0)
-	fs.BlockBitmap.WriteToFile(fs.dataFile, fs.GetBlockBitmapOffset())
-	fs.InodeBitmap.WriteToFile(fs.dataFile, fs.GetInodeBitmapOffset())
-	rootInode.WriteToFile(fs.dataFile, fs.GetInodeTableOffset())
-	rootDir.WriteToFile(fs.dataFile, fs.GetDataBlocksOffset())
+	fs.Superblock.WriteAt(fs.dataFile, 0)
+	fs.BlockBitmap.WriteAt(fs.dataFile, fs.GetBlockBitmapOffset())
+	fs.InodeBitmap.WriteAt(fs.dataFile, fs.GetInodeBitmapOffset())
+	rootInode.WriteAt(fs.dataFile, fs.GetInodeTableOffset())
+	rootDir.WriteAt(fs.dataFile, fs.GetDataBlocksOffset())
+
+	fs.currentDirectory = rootDir
 }
 
 func (fs FileSystem) GetBlockBitmapOffset() int {
