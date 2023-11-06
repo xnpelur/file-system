@@ -11,36 +11,37 @@ type FileSystem struct {
 	Superblock  *superblock.Superblock
 	BlockBitmap *bitmap.Bitmap
 	InodeBitmap *bitmap.Bitmap
+	dataFile    *os.File
 }
 
 func FormatFilesystem(sizeInBytes int, blockSize int) (*FileSystem, error) {
-	file, err := os.Create("filesystem.data")
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
 	fileSystem := FileSystem{}
 	fileSystem.Superblock = superblock.NewSuperblock(uint32(sizeInBytes), uint32(blockSize))
 	fileSystem.BlockBitmap = bitmap.NewBitmap(fileSystem.Superblock.BlockCount)
 	fileSystem.InodeBitmap = bitmap.NewBitmap(fileSystem.Superblock.InodeCount)
 
-	superblock.WriteSuperBlockToFile(file, 0, *fileSystem.Superblock)
-	fileSystem.BlockBitmap.WriteToFile(file, fileSystem.GetBlockBitmapOffset())
-	fileSystem.InodeBitmap.WriteToFile(file, fileSystem.GetInodeBitmapOffset())
+	var err error
+	fileSystem.dataFile, err = os.Create("filesystem.data")
+	if err != nil {
+		return nil, err
+	}
+
+	superblock.WriteSuperBlockToFile(fileSystem.dataFile, 0, *fileSystem.Superblock)
+	fileSystem.BlockBitmap.WriteToFile(fileSystem.dataFile, fileSystem.GetBlockBitmapOffset())
+	fileSystem.InodeBitmap.WriteToFile(fileSystem.dataFile, fileSystem.GetInodeBitmapOffset())
 
 	inodeTableSize := fileSystem.Superblock.InodeCount * uint32(inode.GetInodeSize())
-	ReserveSpaceInFile(file, fileSystem.GetInodeTableOffset(), inodeTableSize+uint32(sizeInBytes))
+	fileSystem.ReserveSpaceInFile(fileSystem.GetInodeTableOffset(), inodeTableSize+uint32(sizeInBytes))
 
-	fileSystem.CreateRootDirectory(file)
+	fileSystem.CreateRootDirectory()
 
 	return &fileSystem, nil
 }
 
-func ReserveSpaceInFile(file *os.File, offset int, size uint32) error {
+func (fs FileSystem) ReserveSpaceInFile(offset int, size uint32) error {
 	data := make([]byte, size)
 
-	_, err := file.WriteAt(data, int64(offset))
+	_, err := fs.dataFile.WriteAt(data, int64(offset))
 	if err != nil {
 		return err
 	}
@@ -48,15 +49,15 @@ func ReserveSpaceInFile(file *os.File, offset int, size uint32) error {
 	return nil
 }
 
-func (fs FileSystem) CreateRootDirectory(file *os.File) {
+func (fs FileSystem) CreateRootDirectory() {
 	fs.InodeBitmap.SetBit(0, 1)
 	fs.BlockBitmap.SetBit(0, 1)
 
-	fs.BlockBitmap.WriteToFile(file, fs.GetBlockBitmapOffset())
-	fs.InodeBitmap.WriteToFile(file, fs.GetInodeBitmapOffset())
+	fs.BlockBitmap.WriteToFile(fs.dataFile, fs.GetBlockBitmapOffset())
+	fs.InodeBitmap.WriteToFile(fs.dataFile, fs.GetInodeBitmapOffset())
 
 	rootInode := inode.NewInode(false, 000, 0, 0, 1024)
-	rootInode.WriteToFile(file, fs.GetInodeTableOffset(), 0)
+	rootInode.WriteToFile(fs.dataFile, fs.GetInodeTableOffset(), 0)
 }
 
 func (fs FileSystem) GetBlockBitmapOffset() int {
@@ -69,4 +70,8 @@ func (fs FileSystem) GetInodeBitmapOffset() int {
 
 func (fs FileSystem) GetInodeTableOffset() int {
 	return fs.GetInodeBitmapOffset() + int(fs.InodeBitmap.Size)
+}
+
+func (fs FileSystem) CloseDataFile() error {
+	return fs.dataFile.Close()
 }
