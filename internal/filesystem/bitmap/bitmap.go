@@ -46,8 +46,8 @@ func (b *Bitmap) ToByteArray() []byte {
 	return b.Data
 }
 
-func WriteBitmapToFile(file *os.File, offset int, value Bitmap) error {
-	data := value.ToByteArray()
+func (b Bitmap) WriteToFile(file *os.File, offset int) error {
+	data := b.ToByteArray()
 
 	_, err := file.WriteAt(data, int64(offset))
 	if err != nil {

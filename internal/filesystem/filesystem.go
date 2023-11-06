@@ -25,21 +25,14 @@ func FormatFilesystem(sizeInBytes int, blockSize int) (*FileSystem, error) {
 	fileSystem.BlockBitmap = bitmap.NewBitmap(fileSystem.Superblock.BlockCount)
 	fileSystem.InodeBitmap = bitmap.NewBitmap(fileSystem.Superblock.InodeCount)
 
-	offset := 0
-
-	superblock.WriteSuperBlockToFile(file, offset, *fileSystem.Superblock)
-	offset += fileSystem.Superblock.Size()
-
-	bitmap.WriteBitmapToFile(file, offset, *fileSystem.BlockBitmap)
-	offset += int(fileSystem.BlockBitmap.Size)
-
-	bitmap.WriteBitmapToFile(file, offset, *fileSystem.InodeBitmap)
-	offset += int(fileSystem.InodeBitmap.Size)
+	superblock.WriteSuperBlockToFile(file, 0, *fileSystem.Superblock)
+	fileSystem.BlockBitmap.WriteToFile(file, fileSystem.GetBlockBitmapOffset())
+	fileSystem.InodeBitmap.WriteToFile(file, fileSystem.GetInodeBitmapOffset())
 
 	inodeTableSize := fileSystem.Superblock.InodeCount * uint32(inode.GetInodeSize())
-	ReserveSpaceInFile(file, offset, inodeTableSize+uint32(sizeInBytes))
+	ReserveSpaceInFile(file, fileSystem.GetInodeTableOffset(), inodeTableSize+uint32(sizeInBytes))
 
-	fileSystem.CreateRootDirectory(file, offset)
+	fileSystem.CreateRootDirectory(file)
 
 	return &fileSystem, nil
 }
@@ -55,10 +48,25 @@ func ReserveSpaceInFile(file *os.File, offset int, size uint32) error {
 	return nil
 }
 
-func (fs FileSystem) CreateRootDirectory(file *os.File, inodeTableOffset int) {
+func (fs FileSystem) CreateRootDirectory(file *os.File) {
 	fs.InodeBitmap.SetBit(0, 1)
 	fs.BlockBitmap.SetBit(0, 1)
 
+	fs.BlockBitmap.WriteToFile(file, fs.GetBlockBitmapOffset())
+	fs.InodeBitmap.WriteToFile(file, fs.GetInodeBitmapOffset())
+
 	rootInode := inode.NewInode(false, 000, 0, 0, 1024)
-	rootInode.WriteToFile(file, inodeTableOffset, 0)
+	rootInode.WriteToFile(file, fs.GetInodeTableOffset(), 0)
+}
+
+func (fs FileSystem) GetBlockBitmapOffset() int {
+	return fs.Superblock.Size()
+}
+
+func (fs FileSystem) GetInodeBitmapOffset() int {
+	return fs.GetBlockBitmapOffset() + int(fs.BlockBitmap.Size)
+}
+
+func (fs FileSystem) GetInodeTableOffset() int {
+	return fs.GetInodeBitmapOffset() + int(fs.InodeBitmap.Size)
 }

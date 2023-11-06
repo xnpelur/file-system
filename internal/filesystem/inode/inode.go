@@ -1,6 +1,7 @@
 package inode
 
 import (
+	"encoding/binary"
 	"file-system/internal/utils"
 	"os"
 )
@@ -119,6 +120,33 @@ func PackTypeAndPermissions(typeAndPermissions TypeAndPermissions) uint16 {
 	return value
 }
 
-func (i Inode) WriteToFile(file *os.File, inodeTableOffset int, inodeIndex int) {
-	panic("[Inode.WriteToFile(...)] - not implemented yet!")
+func (inode Inode) WriteToFile(file *os.File, inodeTableOffset int, inodeIndex int) error {
+	offset := inodeTableOffset + inodeIndex*GetInodeSize()
+	data := encodeInode(inode)
+
+	_, err := file.WriteAt(data, int64(offset))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func encodeInode(value Inode) []byte {
+	data := make([]byte, 68)
+
+	binary.BigEndian.PutUint16(data[0:2], value.TypeAndPermissions)
+	binary.BigEndian.PutUint16(data[2:4], value.UserId)
+	binary.BigEndian.PutUint16(data[4:6], value.GroupId)
+	binary.BigEndian.PutUint32(data[6:10], value.FileSize)
+	binary.BigEndian.PutUint32(data[10:14], value.CreationTime)
+	binary.BigEndian.PutUint32(data[14:18], value.ModificationTime)
+	binary.BigEndian.PutUint16(data[18:20], value.LinkCount)
+
+	for i := 0; i < 12; i++ {
+		offset := 20 + i*4
+		binary.BigEndian.PutUint32(data[offset:offset+4], value.FileData[i])
+	}
+
+	return data
 }
