@@ -28,13 +28,13 @@ func (d *Directory) AddFile(inode uint32, name string) {
 	d.Records = append(d.Records, record.NewRecord(inode, name))
 }
 
-func (d Directory) WriteAt(file *os.File, offset int) error {
+func (d Directory) WriteAt(file *os.File, offset uint32) error {
 	for _, rec := range d.Records {
 		err := rec.WriteAt(file, offset)
 		if err != nil {
 			return err
 		}
-		offset += int(rec.RecordLength)
+		offset += uint32(rec.RecordLength)
 	}
 	return nil
 }

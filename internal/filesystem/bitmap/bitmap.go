@@ -63,7 +63,7 @@ func (b *Bitmap) ToByteArray() []byte {
 	return b.Data
 }
 
-func (b Bitmap) WriteAt(file *os.File, offset int) error {
+func (b Bitmap) WriteAt(file *os.File, offset uint32) error {
 	data := b.ToByteArray()
 
 	_, err := file.WriteAt(data, int64(offset))

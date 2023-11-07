@@ -28,17 +28,17 @@ func NewSuperblock(filesystemSizeInBytes, blockSize uint32) *Superblock {
 	s.FreeBlockCount = blockCount
 	s.FreeInodeCount = blockCount
 	s.BlockSize = blockSize
-	s.InodeSize = uint32(inode.GetInodeSize())
+	s.InodeSize = inode.GetInodeSize()
 
 	return &s
 }
 
-func (s Superblock) Size() int {
+func (s Superblock) Size() uint32 {
 	size, _ := utils.CalculateStructSize(s)
 	return size
 }
 
-func (s Superblock) WriteAt(file *os.File, offset int) error {
+func (s Superblock) WriteAt(file *os.File, offset uint32) error {
 	data := encodeSuperblock(s)
 
 	_, err := file.WriteAt(data, int64(offset))

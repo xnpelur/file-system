@@ -71,7 +71,7 @@ func NewTypeAndPermissions(isFile bool, numericPermissions int) TypeAndPermissio
 	}
 }
 
-func GetInodeSize() int {
+func GetInodeSize() uint32 {
 	inodeDummy := Inode{}
 	size, _ := utils.CalculateStructSize(inodeDummy)
 	return size
@@ -128,7 +128,7 @@ func PackTypeAndPermissions(typeAndPermissions TypeAndPermissions) uint16 {
 	return value
 }
 
-func (inode Inode) WriteAt(file *os.File, offset int) error {
+func (inode Inode) WriteAt(file *os.File, offset uint32) error {
 	data := inode.encode()
 
 	_, err := file.WriteAt(data, int64(offset))

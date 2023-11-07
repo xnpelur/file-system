@@ -23,7 +23,7 @@ func NewRecord(inode uint32, name string) Record {
 	return recordInstance
 }
 
-func (r Record) WriteAt(file *os.File, offset int) error {
+func (r Record) WriteAt(file *os.File, offset uint32) error {
 	data := r.encode()
 
 	_, err := file.WriteAt(data, int64(offset))
