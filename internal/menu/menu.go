@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 )
 
 type Menu struct {
@@ -18,9 +19,18 @@ func NewMenu() Menu {
 
 func (m Menu) Start() {
 	var err error
-	m.fileSystem, err = filesystem.FormatFilesystem(1*1024*1024, 1024) // 1Mb - filesystem, 1kb - block
+	m.fileSystem, err = filesystem.OpenFilesystem()
 	if err != nil {
-		log.Fatal(err)
+		fmt.Printf("Не удалось открыть файловую систему из файла %s\n", filesystem.FilesystemConfig.FileName)
+		ans := getYesOrNo("Форматировать новую файловую систему (все данные будут потеряны)? (y/n): ")
+		if ans {
+			m.fileSystem, err = filesystem.FormatFilesystem(1*1024*1024, 1024) // 1Mb - filesystem, 1kb - block
+			if err != nil {
+				log.Fatal(err)
+			}
+		} else {
+			return
+		}
 	}
 	defer m.fileSystem.CloseDataFile()
 
@@ -43,5 +53,23 @@ func (m Menu) Start() {
 				fmt.Printf("Error: %s\n", err.Error())
 			}
 		}
+	}
+}
+
+func getYesOrNo(prompt string) bool {
+	reader := bufio.NewReader(os.Stdin)
+
+	for {
+		fmt.Print(prompt)
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+		input = strings.ToLower(input)
+
+		if input == "y" {
+			return true
+		} else if input == "n" {
+			return false
+		}
+		fmt.Println("Некорректный ввод, попробуйте ещё раз.")
 	}
 }

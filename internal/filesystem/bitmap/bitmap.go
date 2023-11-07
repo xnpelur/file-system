@@ -59,14 +59,22 @@ func (b *Bitmap) TakeFreeBit() (uint32, error) {
 	return 0, errors.New("no zero bits found")
 }
 
-func (b *Bitmap) ToByteArray() []byte {
-	return b.Data
+func ReadBitmapAt(file *os.File, offset uint32, size uint32) (*Bitmap, error) {
+	data := make([]uint8, size)
+
+	_, err := file.ReadAt(data, int64(offset))
+	if err != nil {
+		return nil, err
+	}
+
+	return &Bitmap{
+		Data: data,
+		Size: size,
+	}, nil
 }
 
 func (b Bitmap) WriteAt(file *os.File, offset uint32) error {
-	data := b.ToByteArray()
-
-	_, err := file.WriteAt(data, int64(offset))
+	_, err := file.WriteAt(b.Data, int64(offset))
 	if err != nil {
 		return err
 	}

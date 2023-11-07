@@ -38,6 +38,31 @@ func (s Superblock) Size() uint32 {
 	return size
 }
 
+func ReadSuperblockAt(file *os.File, offset uint32) (*Superblock, error) {
+	data := make([]byte, Superblock{}.Size())
+
+	_, err := file.ReadAt(data, int64(offset))
+	if err != nil {
+		return nil, err
+	}
+
+	return decodeSuperblock(data), nil
+}
+
+func decodeSuperblock(data []byte) *Superblock {
+	s := Superblock{}
+
+	s.MagicNumber = binary.BigEndian.Uint16(data[0:2])
+	s.BlockCount = binary.BigEndian.Uint32(data[2:6])
+	s.InodeCount = binary.BigEndian.Uint32(data[6:10])
+	s.FreeBlockCount = binary.BigEndian.Uint32(data[10:14])
+	s.FreeInodeCount = binary.BigEndian.Uint32(data[14:18])
+	s.BlockSize = binary.BigEndian.Uint32(data[18:22])
+	s.InodeSize = binary.BigEndian.Uint32(data[22:26])
+
+	return &s
+}
+
 func (s Superblock) WriteAt(file *os.File, offset uint32) error {
 	data := encodeSuperblock(s)
 
