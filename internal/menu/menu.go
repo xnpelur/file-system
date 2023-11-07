@@ -25,7 +25,7 @@ func (m Menu) Start() {
 	defer m.fileSystem.CloseDataFile()
 
 	for {
-		fmt.Print("user@filesystem:/$ ")
+		fmt.Print("root@filesystem:/$ ")
 		scanner := bufio.NewScanner(os.Stdin)
 		scanner.Scan()
 		err := scanner.Err()
@@ -38,7 +38,10 @@ func (m Menu) Start() {
 			fmt.Println("File system closed.")
 			return
 		} else {
-			m.fileSystem.ExecuteCommand(input)
+			err := m.fileSystem.ExecuteCommand(input)
+			if err != nil {
+				fmt.Printf("Error: %s\n", err.Error())
+			}
 		}
 	}
 }

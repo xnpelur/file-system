@@ -52,7 +52,7 @@ func (fs *FileSystem) ExecuteCommand(command string) error {
 		fs.currentDirectory.ListRecords()
 		return nil
 	default:
-		return fmt.Errorf("unknown command: %s", command)
+		return fmt.Errorf("unknown command - %s", command)
 	}
 }
 
