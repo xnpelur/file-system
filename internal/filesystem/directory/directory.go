@@ -2,6 +2,7 @@ package directory
 
 import (
 	"file-system/internal/filesystem/directory/record"
+	"fmt"
 	"os"
 )
 
@@ -37,4 +38,10 @@ func (d Directory) WriteAt(file *os.File, offset uint32) error {
 		offset += uint32(rec.RecordLength)
 	}
 	return nil
+}
+
+func (d Directory) ListRecords() {
+	for _, record := range d.Records {
+		fmt.Println(record.Name)
+	}
 }

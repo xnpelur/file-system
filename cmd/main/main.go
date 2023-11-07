@@ -11,4 +11,7 @@ func main() {
 		log.Fatal(err)
 	}
 	defer fileSystem.CloseDataFile()
+
+	fileSystem.ExecuteCommand("create hello.txt")
+	fileSystem.ExecuteCommand("list")
 }

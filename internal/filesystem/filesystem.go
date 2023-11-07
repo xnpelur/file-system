@@ -6,6 +6,7 @@ import (
 	"file-system/internal/filesystem/inode"
 	"file-system/internal/filesystem/superblock"
 	"os"
+	"strings"
 )
 
 type FileSystem struct {
@@ -40,7 +41,18 @@ func FormatFilesystem(sizeInBytes uint32, blockSize uint32) (*FileSystem, error)
 	return &fileSystem, nil
 }
 
-func (fs FileSystem) ReserveSpaceInFile(offset uint32, size uint32) error {
+func (fs *FileSystem) ExecuteCommand(command string) {
+	parts := strings.Fields(command)
+
+	switch parts[0] {
+	case "create":
+		fs.CreateFile(parts[1])
+	case "list":
+		fs.currentDirectory.ListRecords()
+	}
+}
+
+func (fs *FileSystem) ReserveSpaceInFile(offset uint32, size uint32) error {
 	data := make([]byte, size)
 
 	_, err := fs.dataFile.WriteAt(data, int64(offset))
@@ -51,7 +63,7 @@ func (fs FileSystem) ReserveSpaceInFile(offset uint32, size uint32) error {
 	return nil
 }
 
-func (fs FileSystem) CreateRootDirectory() {
+func (fs *FileSystem) CreateRootDirectory() {
 	fs.BlockBitmap.SetBit(0, 1)
 	fs.InodeBitmap.SetBit(0, 1)
 
@@ -68,10 +80,9 @@ func (fs FileSystem) CreateRootDirectory() {
 	rootDir.WriteAt(fs.dataFile, fs.GetDataBlocksOffset())
 
 	fs.currentDirectory = rootDir
-	fs.CreateFirstFile("hello.txt")
 }
 
-func (fs FileSystem) CreateFirstFile(name string) error {
+func (fs *FileSystem) CreateFile(name string) error {
 	blockIndex, err := fs.BlockBitmap.TakeFreeBit()
 	if err != nil {
 		return err
@@ -109,6 +120,6 @@ func (fs FileSystem) GetDataBlocksOffset() uint32 {
 	return fs.GetInodeTableOffset() + fs.Superblock.InodeCount*fs.Superblock.InodeSize
 }
 
-func (fs FileSystem) CloseDataFile() error {
+func (fs *FileSystem) CloseDataFile() error {
 	return fs.dataFile.Close()
 }
