@@ -5,6 +5,7 @@ import (
 	"file-system/internal/filesystem/directory"
 	"file-system/internal/filesystem/inode"
 	"file-system/internal/filesystem/superblock"
+	"fmt"
 	"os"
 	"strings"
 )
@@ -41,14 +42,17 @@ func FormatFilesystem(sizeInBytes uint32, blockSize uint32) (*FileSystem, error)
 	return &fileSystem, nil
 }
 
-func (fs *FileSystem) ExecuteCommand(command string) {
+func (fs *FileSystem) ExecuteCommand(command string) error {
 	parts := strings.Fields(command)
 
 	switch parts[0] {
 	case "create":
-		fs.CreateFile(parts[1])
+		return fs.CreateFile(parts[1])
 	case "list":
 		fs.currentDirectory.ListRecords()
+		return nil
+	default:
+		return fmt.Errorf("unknown command: %s", command)
 	}
 }
 
