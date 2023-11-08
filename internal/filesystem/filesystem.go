@@ -1,6 +1,7 @@
 package filesystem
 
 import (
+	"bytes"
 	"file-system/internal/filesystem/bitmap"
 	"file-system/internal/filesystem/directory"
 	"file-system/internal/filesystem/inode"
@@ -108,6 +109,12 @@ func (fs *FileSystem) ExecuteCommand(command string, args []string) error {
 			fileContent = args[1]
 		}
 		return fs.CreateFile(fileName, fileContent)
+	case "read":
+		if len(args) < 1 {
+			return fmt.Errorf("missing arguments - %s", command)
+		}
+		fileName := args[0]
+		return fs.ReadFile(fileName)
 	case "list":
 		fs.currentDirectory.ListRecords()
 		return nil
@@ -173,6 +180,41 @@ func (fs *FileSystem) CreateFile(name string, content string) error {
 			return err
 		}
 	}
+
+	return nil
+}
+
+func (fs FileSystem) ReadFile(fileName string) error {
+	inodeIndex, err := fs.currentDirectory.GetInode(fileName)
+	if err != nil {
+		return err
+	}
+
+	inodeOffset := fs.GetInodeTableOffset() + inodeIndex*fs.Superblock.InodeSize
+	fileInode, err := inode.ReadInodeAt(fs.dataFile, inodeOffset)
+	if err != nil {
+		return err
+	}
+
+	if !inode.UnpackTypeAndPermissions(fileInode.TypeAndPermissions).IsFile {
+		return fmt.Errorf("record is not a file - %s", fileName)
+	}
+
+	blockOffset := fs.GetDataBlocksOffset() + fileInode.Blocks[0]*fs.Superblock.BlockSize
+
+	data := make([]byte, fs.Superblock.BlockSize)
+	_, err = fs.dataFile.ReadAt(data, int64(blockOffset))
+	if err != nil {
+		return err
+	}
+
+	nullIndex := bytes.Index(data, []byte{0})
+	if nullIndex == -1 {
+		return fmt.Errorf("null terminator not found in file - %s", fileName)
+	}
+
+	str := string(data[:nullIndex])
+	fmt.Println(str)
 
 	return nil
 }

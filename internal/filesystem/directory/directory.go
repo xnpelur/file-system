@@ -94,3 +94,12 @@ func (d Directory) ListRecords() {
 		fmt.Println(record.Name)
 	}
 }
+
+func (d Directory) GetInode(recordName string) (uint32, error) {
+	for _, r := range d.Records {
+		if r.Name == recordName {
+			return r.Inode, nil
+		}
+	}
+	return 0, fmt.Errorf("record not found - %s", recordName)
+}
