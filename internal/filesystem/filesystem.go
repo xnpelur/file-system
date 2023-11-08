@@ -7,7 +7,6 @@ import (
 	"file-system/internal/filesystem/superblock"
 	"fmt"
 	"os"
-	"strings"
 )
 
 type Config struct {
@@ -64,7 +63,7 @@ func OpenFilesystem() (*FileSystem, error) {
 		return nil, err
 	}
 
-	dirOffset := fileSystem.GetDataBlocksOffset() + fileSystem.currentDirectoryInode.FileData[0]
+	dirOffset := fileSystem.GetDataBlocksOffset() + fileSystem.currentDirectoryInode.Blocks[0]
 	fileSystem.currentDirectory, err = directory.ReadDirectoryAt(fileSystem.dataFile, dirOffset)
 	if err != nil {
 		return nil, err
@@ -97,12 +96,18 @@ func FormatFilesystem(sizeInBytes uint32, blockSize uint32) (*FileSystem, error)
 	return &fileSystem, nil
 }
 
-func (fs *FileSystem) ExecuteCommand(command string) error {
-	parts := strings.Fields(command)
-
-	switch parts[0] {
+func (fs *FileSystem) ExecuteCommand(command string, args []string) error {
+	switch command {
 	case "create":
-		return fs.CreateFile(parts[1])
+		if len(args) < 1 {
+			return fmt.Errorf("missing arguments - %s", command)
+		}
+		fileName := args[0]
+		fileContent := ""
+		if len(args) > 1 {
+			fileContent = args[1]
+		}
+		return fs.CreateFile(fileName, fileContent)
 	case "list":
 		fs.currentDirectory.ListRecords()
 		return nil
@@ -139,7 +144,7 @@ func (fs *FileSystem) CreateRootDirectory() {
 	fs.currentDirectory.WriteAt(fs.dataFile, fs.GetDataBlocksOffset())
 }
 
-func (fs *FileSystem) CreateFile(name string) error {
+func (fs *FileSystem) CreateFile(name string, content string) error {
 	blockIndex, err := fs.BlockBitmap.TakeFreeBit()
 	if err != nil {
 		return err
@@ -157,7 +162,17 @@ func (fs *FileSystem) CreateFile(name string) error {
 	fileInode.WriteAt(fs.dataFile, inodeOffset)
 
 	fs.currentDirectory.AddFile(inodeIndex, name)
-	fs.currentDirectory.WriteAt(fs.dataFile, fs.GetDataBlocksOffset()+fs.currentDirectoryInode.FileData[0])
+	fs.currentDirectory.WriteAt(fs.dataFile, fs.GetDataBlocksOffset()+fs.currentDirectoryInode.Blocks[0])
+
+	if len(content) > 0 {
+		data := []byte(content)
+		offset := fs.GetDataBlocksOffset() + blockIndex*fs.Superblock.BlockSize
+
+		_, err := fs.dataFile.WriteAt(data, int64(offset))
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }

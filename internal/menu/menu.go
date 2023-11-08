@@ -43,17 +43,46 @@ func (m Menu) Start() {
 			log.Fatal(err)
 		}
 		input := scanner.Text()
+		parts := parseCommand(input)
 
-		if input == "exit" {
+		if parts[0] == "exit" {
 			fmt.Println("File system closed.")
 			return
 		} else {
-			err := m.fileSystem.ExecuteCommand(input)
+			err := m.fileSystem.ExecuteCommand(parts[0], parts[1:])
 			if err != nil {
 				fmt.Printf("Error: %s\n", err.Error())
 			}
 		}
 	}
+}
+
+func parseCommand(input string) []string {
+	var parts []string
+	var currentPart string
+	inQuotes := false
+
+	for _, part := range strings.Fields(input) {
+		if strings.HasPrefix(part, `"`) {
+			inQuotes = true
+			currentPart = part[1:]
+		} else if strings.HasSuffix(part, `"`) {
+			inQuotes = false
+			currentPart += " " + part[:len(part)-1]
+			parts = append(parts, currentPart)
+			currentPart = ""
+		} else if inQuotes {
+			currentPart += " " + part
+		} else {
+			parts = append(parts, part)
+		}
+	}
+
+	if len(currentPart) > 0 {
+		parts = append(parts, currentPart)
+	}
+
+	return parts
 }
 
 func getYesOrNo(prompt string) bool {

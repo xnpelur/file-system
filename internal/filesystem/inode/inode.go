@@ -15,7 +15,7 @@ type Inode struct {
 	CreationTime       uint32
 	ModificationTime   uint32
 	LinkCount          uint16
-	FileData           [12]uint32
+	Blocks             [12]uint32
 }
 
 type TypeAndPermissions struct {
@@ -38,19 +38,19 @@ func NewInode(
 	groupId int,
 	dataBlocks []uint32,
 ) *Inode {
-	var fileData [12]uint32
+	var blocks [12]uint32
 	for i, dataBlock := range dataBlocks {
 		if i >= 12 {
 			break
 		}
-		fileData[i] = dataBlock
+		blocks[i] = dataBlock
 	}
 	return &Inode{
 		TypeAndPermissions: PackTypeAndPermissions(NewTypeAndPermissions(isFile, numericPermissions)),
 		UserId:             uint16(userId),
 		GroupId:            uint16(groupId),
 		FileSize:           uint32(len(dataBlocks)),
-		FileData:           fileData,
+		Blocks:             blocks,
 	}
 }
 
@@ -157,7 +157,7 @@ func decodeInode(data []byte) *Inode {
 
 	for i := 0; i < 12; i++ {
 		offset := 20 + i*4
-		inode.FileData[i] = binary.BigEndian.Uint32(data[offset : offset+4])
+		inode.Blocks[i] = binary.BigEndian.Uint32(data[offset : offset+4])
 	}
 
 	return &inode
@@ -187,7 +187,7 @@ func (value Inode) encode() []byte {
 
 	for i := 0; i < 12; i++ {
 		offset := 20 + i*4
-		binary.BigEndian.PutUint32(data[offset:offset+4], value.FileData[i])
+		binary.BigEndian.PutUint32(data[offset:offset+4], value.Blocks[i])
 	}
 
 	return data
