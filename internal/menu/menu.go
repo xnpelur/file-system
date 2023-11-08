@@ -64,6 +64,10 @@ func parseCommand(input string) []string {
 
 	for _, part := range strings.Fields(input) {
 		if strings.HasPrefix(part, `"`) {
+			if strings.HasSuffix(part, `"`) {
+				parts = append(parts, part[1:len(part)-1])
+				continue
+			}
 			inQuotes = true
 			currentPart = part[1:]
 		} else if strings.HasSuffix(part, `"`) {

@@ -19,6 +19,10 @@ func TestParseCommand(t *testing.T) {
 			expected: []string{"create", "file", "hello world"},
 		},
 		{
+			input:    "create file \"hello\"",
+			expected: []string{"create", "file", "hello"},
+		},
+		{
 			input:    "command \"first argument\" \"second argument\" \"incorrect argument",
 			expected: []string{"command", "first argument", "second argument", "incorrect argument"},
 		},
