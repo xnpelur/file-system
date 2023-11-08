@@ -6,6 +6,7 @@ import (
 	"file-system/internal/filesystem/directory"
 	"file-system/internal/filesystem/inode"
 	"file-system/internal/filesystem/superblock"
+	"file-system/internal/utils"
 	"fmt"
 	"os"
 )
@@ -109,6 +110,16 @@ func (fs *FileSystem) ExecuteCommand(command string, args []string) error {
 			fileContent = args[1]
 		}
 		return fs.CreateFile(fileName, fileContent)
+	case "edit":
+		if len(args) < 1 {
+			return fmt.Errorf("missing arguments - %s", command)
+		}
+		fileName := args[0]
+		fileContent := ""
+		if len(args) > 1 {
+			fileContent = args[1]
+		}
+		return fs.EditFile(fileName, fileContent)
 	case "read":
 		if len(args) < 1 {
 			return fmt.Errorf("missing arguments - %s", command)
@@ -172,7 +183,7 @@ func (fs *FileSystem) CreateFile(name string, content string) error {
 	fs.currentDirectory.WriteAt(fs.dataFile, fs.GetDataBlocksOffset()+fs.currentDirectoryInode.Blocks[0])
 
 	if len(content) > 0 {
-		data := []byte(content)
+		data := utils.StringToByteBlock(content, fs.Superblock.BlockSize)
 		offset := fs.GetDataBlocksOffset() + blockIndex*fs.Superblock.BlockSize
 
 		_, err := fs.dataFile.WriteAt(data, int64(offset))
@@ -215,6 +226,33 @@ func (fs FileSystem) ReadFile(fileName string) error {
 
 	str := string(data[:nullIndex])
 	fmt.Println(str)
+
+	return nil
+}
+
+func (fs FileSystem) EditFile(name string, content string) error {
+	inodeIndex, err := fs.currentDirectory.GetInode(name)
+	if err != nil {
+		return err
+	}
+
+	inodeOffset := fs.GetInodeTableOffset() + inodeIndex*fs.Superblock.InodeSize
+	fileInode, err := inode.ReadInodeAt(fs.dataFile, inodeOffset)
+	if err != nil {
+		return err
+	}
+
+	if !inode.UnpackTypeAndPermissions(fileInode.TypeAndPermissions).IsFile {
+		return fmt.Errorf("record is not a file - %s", name)
+	}
+
+	blockOffset := fs.GetDataBlocksOffset() + fileInode.Blocks[0]*fs.Superblock.BlockSize
+	data := utils.StringToByteBlock(content, fs.Superblock.BlockSize)
+
+	_, err = fs.dataFile.WriteAt(data, int64(blockOffset))
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

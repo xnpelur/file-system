@@ -20,3 +20,10 @@ func CalculateStructSize(s any) (uint32, error) {
 
 	return size, nil
 }
+
+func StringToByteBlock(str string, blockSize uint32) []byte {
+	data := make([]byte, blockSize)
+	stringBytes := []byte(str)
+	copy(data, stringBytes)
+	return data
+}
