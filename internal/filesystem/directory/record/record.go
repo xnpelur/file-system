@@ -35,7 +35,7 @@ func (r Record) WriteAt(file *os.File, offset uint32) error {
 }
 
 func (value Record) encode() []byte {
-	data := make([]byte, 16)
+	data := make([]byte, value.RecordLength)
 
 	binary.BigEndian.PutUint32(data[0:4], value.Inode)
 	binary.BigEndian.PutUint16(data[4:6], value.RecordLength)

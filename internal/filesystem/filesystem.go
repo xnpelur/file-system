@@ -27,6 +27,7 @@ type FileSystem struct {
 	dataFile              *os.File
 	currentDirectory      *directory.Directory
 	currentDirectoryInode *inode.Inode
+	currentPath           string
 }
 
 func OpenFilesystem() (*FileSystem, error) {
@@ -72,6 +73,8 @@ func OpenFilesystem() (*FileSystem, error) {
 		return nil, err
 	}
 
+	fileSystem.currentPath = "/"
+
 	return &fileSystem, nil
 }
 
@@ -95,6 +98,7 @@ func FormatFilesystem(sizeInBytes uint32, blockSize uint32) (*FileSystem, error)
 	fileSystem.ReserveSpaceInFile(fileSystem.GetInodeTableOffset(), inodeTableSize+sizeInBytes)
 
 	fileSystem.CreateDirectory("/")
+	fileSystem.currentPath = "/"
 
 	return &fileSystem, nil
 }
@@ -135,6 +139,11 @@ func (fs *FileSystem) ExecuteCommand(command string, args []string) error {
 	case "list":
 		fs.currentDirectory.ListRecords()
 		return nil
+	case "cd":
+		if len(args) < 1 {
+			return fmt.Errorf("missing arguments - %s", command)
+		}
+		return fs.ChangeDirectory(args[0])
 	default:
 		return fmt.Errorf("unknown command - %s", command)
 	}
@@ -199,7 +208,7 @@ func (fs *FileSystem) CreateDirectory(name string) error {
 		}
 	} else {
 		fs.currentDirectory.AddFile(inodeIndex, name)
-		fs.currentDirectory.WriteAt(fs.dataFile, fs.GetDataBlocksOffset()+fs.currentDirectoryInode.Blocks[0])
+		fs.currentDirectory.WriteAt(fs.dataFile, fs.GetDataBlocksOffset()+fs.currentDirectoryInode.Blocks[0]*fs.Superblock.BlockSize)
 	}
 
 	return nil
@@ -227,6 +236,31 @@ func (fs *FileSystem) CreateFileOrDirectory(isFile bool) (uint32, uint32, error)
 	fileInode.WriteAt(fs.dataFile, inodeOffset)
 
 	return blockIndex, inodeIndex, nil
+}
+
+func (fs *FileSystem) ChangeDirectory(path string) error {
+	inodeIndex, err := fs.currentDirectory.GetInode(path)
+	if err != nil {
+		return err
+	}
+
+	inodeOffset := fs.GetInodeTableOffset() + inodeIndex*fs.Superblock.InodeSize
+	dirInode, err := inode.ReadInodeAt(fs.dataFile, inodeOffset)
+	if err != nil {
+		return err
+	}
+
+	dirOffset := fs.GetDataBlocksOffset() + dirInode.Blocks[0]*fs.Superblock.BlockSize
+	dir, err := directory.ReadDirectoryAt(fs.dataFile, dirOffset)
+	if err != nil {
+		return err
+	}
+
+	fs.currentDirectory = dir
+	fs.currentDirectoryInode = dirInode
+	fs.currentPath = utils.ChangeDirectoryPath(fs.currentPath, path)
+
+	return nil
 }
 
 func (fs FileSystem) ReadFile(fileName string) error {
@@ -289,6 +323,10 @@ func (fs FileSystem) EditFile(name string, content string) error {
 	}
 
 	return nil
+}
+
+func (fs FileSystem) GetCurrentPath() string {
+	return fs.currentPath
 }
 
 func (fs FileSystem) GetBlockBitmapOffset() uint32 {

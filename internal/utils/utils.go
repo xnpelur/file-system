@@ -3,6 +3,7 @@ package utils
 import (
 	"errors"
 	"reflect"
+	"strings"
 )
 
 func CalculateStructSize(s any) (uint32, error) {
@@ -26,4 +27,29 @@ func StringToByteBlock(str string, blockSize uint32) []byte {
 	stringBytes := []byte(str)
 	copy(data, stringBytes)
 	return data
+}
+
+func ChangeDirectoryPath(currentPath, arg string) string {
+	currentPath = strings.Trim(currentPath, "/")
+	currentDirs := strings.Split(currentPath, "/")
+
+	if currentDirs[0] == "" {
+		currentDirs = currentDirs[1:]
+	}
+
+	switch arg {
+	case ".":
+	case "..":
+		if len(currentDirs) > 0 {
+			currentDirs = currentDirs[:len(currentDirs)-1]
+		}
+	default:
+		currentDirs = append(currentDirs, arg)
+	}
+
+	if len(currentDirs) == 0 {
+		return "/"
+	}
+
+	return "/" + strings.Join(currentDirs, "/")
 }
