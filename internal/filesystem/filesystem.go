@@ -175,6 +175,9 @@ func (fs *FileSystem) CreateFile(name string, content string) error {
 	}
 	fs.Superblock.FreeInodeCount--
 
+	fs.BlockBitmap.WriteAt(fs.dataFile, fs.GetBlockBitmapOffset())
+	fs.InodeBitmap.WriteAt(fs.dataFile, fs.GetInodeBitmapOffset())
+
 	fileInode := inode.NewInode(true, 777, 0, 0, []uint32{blockIndex})
 	inodeOffset := fs.GetInodeTableOffset() + fs.Superblock.InodeSize*inodeIndex
 	fileInode.WriteAt(fs.dataFile, inodeOffset)
