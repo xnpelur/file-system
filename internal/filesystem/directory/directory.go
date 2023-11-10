@@ -9,20 +9,26 @@ import (
 )
 
 type Directory struct {
-	Records []record.Record
+	records map[string]record.Record
 }
 
 func CreateNewDirectory(inode uint32, parentInode uint32) *Directory {
 	currDir := record.NewRecord(inode, ".")
 	parentDir := record.NewRecord(parentInode, "..")
 
+	records := make(map[string]record.Record)
+	records[currDir.Name] = currDir
+	records[parentDir.Name] = parentDir
+
 	return &Directory{
-		Records: []record.Record{currDir, parentDir},
+		records: records,
 	}
 }
 
 func ReadDirectoryAt(file *os.File, offset uint32) (*Directory, error) {
-	directory := Directory{}
+	directory := Directory{
+		records: make(map[string]record.Record),
+	}
 	for {
 		inodeData := make([]byte, 4)
 		_, err := file.ReadAt(inodeData, int64(offset))
@@ -68,18 +74,19 @@ func ReadDirectoryAt(file *os.File, offset uint32) (*Directory, error) {
 			NameLength:   nameLength,
 			Name:         name,
 		}
-		directory.Records = append(directory.Records, record)
+		directory.records[record.Name] = record
 	}
 
 	return &directory, nil
 }
 
 func (d *Directory) AddFile(inode uint32, name string) {
-	d.Records = append(d.Records, record.NewRecord(inode, name))
+	record := record.NewRecord(inode, name)
+	d.records[record.Name] = record
 }
 
 func (d Directory) WriteAt(file *os.File, offset uint32) error {
-	for _, rec := range d.Records {
+	for _, rec := range d.records {
 		err := rec.WriteAt(file, offset)
 		if err != nil {
 			return err
@@ -90,16 +97,15 @@ func (d Directory) WriteAt(file *os.File, offset uint32) error {
 }
 
 func (d Directory) ListRecords() {
-	for _, record := range d.Records {
-		fmt.Println(record.Name)
+	for name := range d.records {
+		fmt.Println(name)
 	}
 }
 
 func (d Directory) GetInode(recordName string) (uint32, error) {
-	for _, r := range d.Records {
-		if r.Name == recordName {
-			return r.Inode, nil
-		}
+	record, exist := d.records[recordName]
+	if exist {
+		return record.Inode, nil
 	}
 	return 0, fmt.Errorf("record not found - %s", recordName)
 }

@@ -67,7 +67,7 @@ func OpenFilesystem() (*FileSystem, error) {
 		return nil, err
 	}
 
-	dirOffset := fileSystem.GetDataBlocksOffset() + fileSystem.currentDirectoryInode.Blocks[0]
+	dirOffset := fileSystem.GetDataBlocksOffset() + fileSystem.currentDirectoryInode.Blocks[0]*fileSystem.Superblock.BlockSize
 	fileSystem.currentDirectory, err = directory.ReadDirectoryAt(fileSystem.dataFile, dirOffset)
 	if err != nil {
 		return nil, err
@@ -167,7 +167,8 @@ func (fs *FileSystem) CreateFile(name string, content string) error {
 	}
 
 	fs.currentDirectory.AddFile(inodeIndex, name)
-	fs.currentDirectory.WriteAt(fs.dataFile, fs.GetDataBlocksOffset()+fs.currentDirectoryInode.Blocks[0])
+	offset := fs.GetDataBlocksOffset() + fs.currentDirectoryInode.Blocks[0]*fs.Superblock.BlockSize
+	fs.currentDirectory.WriteAt(fs.dataFile, offset)
 
 	if len(content) > 0 {
 		data := utils.StringToByteBlock(content, fs.Superblock.BlockSize)
@@ -248,6 +249,10 @@ func (fs *FileSystem) ChangeDirectory(path string) error {
 	dirInode, err := inode.ReadInodeAt(fs.dataFile, inodeOffset)
 	if err != nil {
 		return err
+	}
+
+	if inode.UnpackTypeAndPermissions(dirInode.TypeAndPermissions).IsFile {
+		return fmt.Errorf("record is not a directory - %s", path)
 	}
 
 	dirOffset := fs.GetDataBlocksOffset() + dirInode.Blocks[0]*fs.Superblock.BlockSize
