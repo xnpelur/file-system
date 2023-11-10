@@ -161,6 +161,10 @@ func (fs *FileSystem) ReserveSpaceInFile(offset uint32, size uint32) error {
 }
 
 func (fs *FileSystem) CreateFile(name string, content string) error {
+	if _, err := fs.currentDirectory.GetInode(name); err == nil {
+		return fmt.Errorf("record with name \"%s\" already exists", name)
+	}
+
 	blockIndex, inodeIndex, err := fs.CreateFileOrDirectory(true)
 	if err != nil {
 		return err
@@ -184,6 +188,10 @@ func (fs *FileSystem) CreateFile(name string, content string) error {
 }
 
 func (fs *FileSystem) CreateDirectory(name string) error {
+	if _, err := fs.currentDirectory.GetInode(name); err == nil {
+		return fmt.Errorf("record with name \"%s\" already exists", name)
+	}
+
 	blockIndex, inodeIndex, err := fs.CreateFileOrDirectory(false)
 	if err != nil {
 		return err
