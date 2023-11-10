@@ -48,6 +48,15 @@ func (m Menu) Start() {
 		if parts[0] == "exit" {
 			fmt.Println("File system closed.")
 			return
+		} else if parts[0] == "format" {
+			ans := getYesOrNo("Вы уверены, что хотите форматировать файловую систему (все данные будут потеряны)? (y/n): ")
+			if ans {
+				m.fileSystem, err = filesystem.FormatFilesystem(1*1024*1024, 1024)
+				if err != nil {
+					log.Fatal(err)
+				}
+				fmt.Println("Файловая система форматирована.")
+			}
 		} else {
 			err := m.fileSystem.ExecuteCommand(parts[0], parts[1:])
 			if err != nil {
