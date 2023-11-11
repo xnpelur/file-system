@@ -85,6 +85,10 @@ func (d *Directory) AddFile(inode uint32, name string) {
 	d.records[record.Name] = record
 }
 
+func (d *Directory) DeleteFile(name string) {
+	delete(d.records, name)
+}
+
 func (d Directory) WriteAt(file *os.File, offset uint32) error {
 	for _, rec := range d.records {
 		err := rec.WriteAt(file, offset)

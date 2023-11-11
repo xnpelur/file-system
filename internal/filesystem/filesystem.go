@@ -136,6 +136,12 @@ func (fs *FileSystem) ExecuteCommand(command string, args []string) error {
 		}
 		fileName := args[0]
 		return fs.ReadFile(fileName)
+	case "delete":
+		if len(args) < 1 {
+			return fmt.Errorf("missing arguments - %s", command)
+		}
+		fileName := args[0]
+		return fs.DeleteFile(fileName)
 	case "list":
 		fs.currentDirectory.ListRecords()
 		return nil
@@ -188,8 +194,10 @@ func (fs *FileSystem) CreateFile(name string, content string) error {
 }
 
 func (fs *FileSystem) CreateDirectory(name string) error {
-	if _, err := fs.currentDirectory.GetInode(name); err == nil {
-		return fmt.Errorf("record with name \"%s\" already exists", name)
+	if name != "/" {
+		if _, err := fs.currentDirectory.GetInode(name); err == nil {
+			return fmt.Errorf("record with name \"%s\" already exists", name)
+		}
 	}
 
 	blockIndex, inodeIndex, err := fs.CreateFileOrDirectory(false)
@@ -245,6 +253,51 @@ func (fs *FileSystem) CreateFileOrDirectory(isFile bool) (uint32, uint32, error)
 	fileInode.WriteAt(fs.dataFile, inodeOffset)
 
 	return blockIndex, inodeIndex, nil
+}
+
+func (fs *FileSystem) DeleteFile(name string) error {
+	inodeIndex, err := fs.currentDirectory.GetInode(name)
+	if err != nil {
+		return err
+	}
+
+	offset := fs.GetInodeTableOffset() + inodeIndex*fs.Superblock.InodeSize
+	fileInode, err := inode.ReadInodeAt(fs.dataFile, offset)
+	if err != nil {
+		return err
+	}
+
+	if !inode.UnpackTypeAndPermissions(fileInode.TypeAndPermissions).IsFile {
+		return fmt.Errorf("record is not a file - %s", name)
+	}
+
+	fs.currentDirectory.DeleteFile(name)
+
+	err = fs.BlockBitmap.SetBit(fileInode.Blocks[0], 0)
+	if err != nil {
+		return err
+	}
+	err = fs.InodeBitmap.SetBit(inodeIndex, 0)
+	if err != nil {
+		return err
+	}
+	fs.Superblock.FreeBlockCount++
+	fs.Superblock.FreeInodeCount++
+
+	offset = fs.GetDataBlocksOffset() + fileInode.Blocks[0]*fs.Superblock.BlockSize
+	fs.ReserveSpaceInFile(offset, fs.Superblock.BlockSize)
+
+	offset = fs.GetInodeTableOffset() + inodeIndex*fs.Superblock.InodeSize
+	fs.ReserveSpaceInFile(offset, fs.Superblock.InodeSize)
+
+	offset = fs.GetDataBlocksOffset() + fs.currentDirectoryInode.Blocks[0]*fs.Superblock.BlockSize
+	fs.currentDirectory.WriteAt(fs.dataFile, offset)
+
+	fs.BlockBitmap.WriteAt(fs.dataFile, fs.GetBlockBitmapOffset())
+	fs.InodeBitmap.WriteAt(fs.dataFile, fs.GetInodeBitmapOffset())
+	fs.Superblock.WriteAt(fs.dataFile, 0)
+
+	return nil
 }
 
 func (fs *FileSystem) ChangeDirectory(path string) error {
