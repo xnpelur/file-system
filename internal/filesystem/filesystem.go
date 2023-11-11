@@ -301,30 +301,42 @@ func (fs *FileSystem) DeleteFile(name string) error {
 }
 
 func (fs *FileSystem) ChangeDirectory(path string) error {
-	inodeIndex, err := fs.currentDirectory.GetInode(path)
-	if err != nil {
-		return err
+	dirs := strings.Split(path, "/")
+
+	currDir := fs.currentDirectory
+	currDirInode := fs.currentDirectoryInode
+	currPath := fs.currentPath
+
+	for _, dirName := range dirs {
+		inodeIndex, err := currDir.GetInode(dirName)
+		if err != nil {
+			return err
+		}
+
+		inodeOffset := fs.GetInodeTableOffset() + inodeIndex*fs.Superblock.InodeSize
+		dirInode, err := inode.ReadInodeAt(fs.dataFile, inodeOffset)
+		if err != nil {
+			return err
+		}
+
+		if inode.UnpackTypeAndPermissions(dirInode.TypeAndPermissions).IsFile {
+			return fmt.Errorf("record is not a directory - %s", dirName)
+		}
+
+		dirOffset := fs.GetDataBlocksOffset() + dirInode.Blocks[0]*fs.Superblock.BlockSize
+		dir, err := directory.ReadDirectoryAt(fs.dataFile, dirOffset)
+		if err != nil {
+			return err
+		}
+
+		currDir = dir
+		currDirInode = dirInode
+		currPath = utils.ChangeDirectoryPath(currPath, dirName)
 	}
 
-	inodeOffset := fs.GetInodeTableOffset() + inodeIndex*fs.Superblock.InodeSize
-	dirInode, err := inode.ReadInodeAt(fs.dataFile, inodeOffset)
-	if err != nil {
-		return err
-	}
-
-	if inode.UnpackTypeAndPermissions(dirInode.TypeAndPermissions).IsFile {
-		return fmt.Errorf("record is not a directory - %s", path)
-	}
-
-	dirOffset := fs.GetDataBlocksOffset() + dirInode.Blocks[0]*fs.Superblock.BlockSize
-	dir, err := directory.ReadDirectoryAt(fs.dataFile, dirOffset)
-	if err != nil {
-		return err
-	}
-
-	fs.currentDirectory = dir
-	fs.currentDirectoryInode = dirInode
-	fs.currentPath = utils.ChangeDirectoryPath(fs.currentPath, path)
+	fs.currentDirectory = currDir
+	fs.currentDirectoryInode = currDirInode
+	fs.currentPath = currPath
 
 	return nil
 }
