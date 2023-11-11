@@ -111,8 +111,16 @@ func (fs *FileSystem) ExecuteCommand(command string, args []string) error {
 		}
 		fileName := args[0]
 
-		if strings.HasSuffix(fileName, "/") {
-			return fs.CreateDirectory(fileName[:len(fileName)-1])
+		slashCount := strings.Count(fileName, "/")
+		if slashCount > 0 {
+			if slashCount == 1 && strings.HasSuffix(fileName, "/") {
+				return fs.CreateDirectory(fileName[:len(fileName)-1])
+			}
+			return fmt.Errorf("incorrect file name - %s", fileName)
+		}
+
+		if strings.HasSuffix(fileName, ".") {
+			return fmt.Errorf("incorrect file name - %s", fileName)
 		}
 
 		fileContent := ""
