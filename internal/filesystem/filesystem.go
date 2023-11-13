@@ -149,9 +149,11 @@ func (fs *FileSystem) ExecuteCommand(command string, args []string) error {
 			return fmt.Errorf("missing arguments - %s", command)
 		}
 		fileName := args[0]
-		return fs.DeleteFile(fileName)
+		return fs.DeleteFile(fileName, fs.currentDirectory, fs.currentDirectoryInode)
 	case "list":
-		fs.currentDirectory.ListRecords()
+		for _, name := range fs.currentDirectory.GetRecords() {
+			fmt.Println(name)
+		}
 		return nil
 	case "cd":
 		if len(args) < 1 {
@@ -263,8 +265,12 @@ func (fs *FileSystem) CreateFileOrDirectory(isFile bool) (uint32, uint32, error)
 	return blockIndex, inodeIndex, nil
 }
 
-func (fs *FileSystem) DeleteFile(name string) error {
-	inodeIndex, err := fs.currentDirectory.GetInode(name)
+func (fs *FileSystem) DeleteFile(name string, fromDirectory *directory.Directory, fromInode *inode.Inode) error {
+	if name == "." || name == ".." {
+		return fmt.Errorf("illegal argument - %s", name)
+	}
+
+	inodeIndex, err := fromDirectory.GetInode(name)
 	if err != nil {
 		return err
 	}
@@ -276,10 +282,23 @@ func (fs *FileSystem) DeleteFile(name string) error {
 	}
 
 	if !inode.UnpackTypeAndPermissions(fileInode.TypeAndPermissions).IsFile {
-		return fmt.Errorf("record is not a file - %s", name)
+		dirOffset := fs.GetDataBlocksOffset() + fileInode.Blocks[0]*fs.Superblock.BlockSize
+		dir, err := directory.ReadDirectoryAt(fs.dataFile, dirOffset)
+		if err != nil {
+			return err
+		}
+		for _, name := range dir.GetRecords() {
+			if name == "." || name == ".." {
+				continue
+			}
+			err := fs.DeleteFile(name, dir, fileInode)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
-	fs.currentDirectory.DeleteFile(name)
+	fromDirectory.DeleteFile(name)
 
 	err = fs.BlockBitmap.SetBit(fileInode.Blocks[0], 0)
 	if err != nil {
@@ -298,8 +317,8 @@ func (fs *FileSystem) DeleteFile(name string) error {
 	offset = fs.GetInodeTableOffset() + inodeIndex*fs.Superblock.InodeSize
 	fs.ReserveSpaceInFile(offset, fs.Superblock.InodeSize)
 
-	offset = fs.GetDataBlocksOffset() + fs.currentDirectoryInode.Blocks[0]*fs.Superblock.BlockSize
-	fs.currentDirectory.WriteAt(fs.dataFile, offset)
+	offset = fs.GetDataBlocksOffset() + fromInode.Blocks[0]*fs.Superblock.BlockSize
+	fromDirectory.WriteAt(fs.dataFile, offset)
 
 	fs.BlockBitmap.WriteAt(fs.dataFile, fs.GetBlockBitmapOffset())
 	fs.InodeBitmap.WriteAt(fs.dataFile, fs.GetInodeBitmapOffset())

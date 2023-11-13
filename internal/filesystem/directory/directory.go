@@ -100,10 +100,12 @@ func (d Directory) WriteAt(file *os.File, offset uint32) error {
 	return nil
 }
 
-func (d Directory) ListRecords() {
+func (d Directory) GetRecords() []string {
+	names := make([]string, 0, len(d.records))
 	for name := range d.records {
-		fmt.Println(name)
+		names = append(names, name)
 	}
+	return names
 }
 
 func (d Directory) GetInode(recordName string) (uint32, error) {
