@@ -143,7 +143,12 @@ func (fs *FileSystem) ExecuteCommand(command string, args []string) error {
 			return fmt.Errorf("missing arguments - %s", command)
 		}
 		fileName := args[0]
-		return fs.ReadFile(fileName)
+		content, err := fs.ReadFile(fileName)
+		if err != nil {
+			return err
+		}
+		fmt.Println(content)
+		return nil
 	case "delete":
 		if len(args) < 1 {
 			return fmt.Errorf("missing arguments - %s", command)
@@ -368,20 +373,20 @@ func (fs *FileSystem) ChangeDirectory(path string) error {
 	return nil
 }
 
-func (fs FileSystem) ReadFile(fileName string) error {
+func (fs FileSystem) ReadFile(fileName string) (string, error) {
 	inodeIndex, err := fs.currentDirectory.GetInode(fileName)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	inodeOffset := fs.GetInodeTableOffset() + inodeIndex*fs.Superblock.InodeSize
 	fileInode, err := inode.ReadInodeAt(fs.dataFile, inodeOffset)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if !inode.UnpackTypeAndPermissions(fileInode.TypeAndPermissions).IsFile {
-		return fmt.Errorf("record is not a file - %s", fileName)
+		return "", fmt.Errorf("record is not a file - %s", fileName)
 	}
 
 	blockOffset := fs.GetDataBlocksOffset() + fileInode.Blocks[0]*fs.Superblock.BlockSize
@@ -389,18 +394,16 @@ func (fs FileSystem) ReadFile(fileName string) error {
 	data := make([]byte, fs.Superblock.BlockSize)
 	_, err = fs.dataFile.ReadAt(data, int64(blockOffset))
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	nullIndex := bytes.Index(data, []byte{0})
 	if nullIndex == -1 {
-		return fmt.Errorf("null terminator not found in file - %s", fileName)
+		return "", fmt.Errorf("null terminator not found in file - %s", fileName)
 	}
 
 	str := string(data[:nullIndex])
-	fmt.Println(str)
-
-	return nil
+	return str, nil
 }
 
 func (fs FileSystem) EditFile(name string, content string) error {
