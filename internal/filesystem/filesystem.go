@@ -2,6 +2,7 @@ package filesystem
 
 import (
 	"bytes"
+	"file-system/internal/errs"
 	"file-system/internal/filesystem/bitmap"
 	"file-system/internal/filesystem/directory"
 	"file-system/internal/filesystem/inode"
@@ -107,7 +108,7 @@ func (fs *FileSystem) ExecuteCommand(command string, args []string) error {
 	switch command {
 	case "create":
 		if len(args) < 1 {
-			return fmt.Errorf("missing arguments - %s", command)
+			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
 		fileName := args[0]
 
@@ -116,11 +117,11 @@ func (fs *FileSystem) ExecuteCommand(command string, args []string) error {
 			if slashCount == 1 && strings.HasSuffix(fileName, "/") {
 				return fs.CreateDirectory(fileName[:len(fileName)-1])
 			}
-			return fmt.Errorf("incorrect file name - %s", fileName)
+			return fmt.Errorf("%w - %s", errs.ErrIncorrectFileName, fileName)
 		}
 
 		if strings.HasSuffix(fileName, ".") {
-			return fmt.Errorf("incorrect file name - %s", fileName)
+			return fmt.Errorf("%w - %s", errs.ErrIncorrectFileName, fileName)
 		}
 
 		fileContent := ""
@@ -130,7 +131,7 @@ func (fs *FileSystem) ExecuteCommand(command string, args []string) error {
 		return fs.CreateFile(fileName, fileContent)
 	case "edit":
 		if len(args) < 1 {
-			return fmt.Errorf("missing arguments - %s", command)
+			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
 		fileName := args[0]
 		fileContent := ""
@@ -140,7 +141,7 @@ func (fs *FileSystem) ExecuteCommand(command string, args []string) error {
 		return fs.EditFile(fileName, fileContent)
 	case "read":
 		if len(args) < 1 {
-			return fmt.Errorf("missing arguments - %s", command)
+			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
 		fileName := args[0]
 		content, err := fs.ReadFile(fileName)
@@ -151,7 +152,7 @@ func (fs *FileSystem) ExecuteCommand(command string, args []string) error {
 		return nil
 	case "delete":
 		if len(args) < 1 {
-			return fmt.Errorf("missing arguments - %s", command)
+			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
 		fileName := args[0]
 		return fs.DeleteFile(fileName, fs.currentDirectory, fs.currentDirectoryInode)
@@ -162,11 +163,11 @@ func (fs *FileSystem) ExecuteCommand(command string, args []string) error {
 		return nil
 	case "cd":
 		if len(args) < 1 {
-			return fmt.Errorf("missing arguments - %s", command)
+			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
 		return fs.ChangeDirectory(args[0])
 	default:
-		return fmt.Errorf("unknown command - %s", command)
+		return fmt.Errorf("%w - %s", errs.ErrUnknownCommand, command)
 	}
 }
 
@@ -183,7 +184,7 @@ func (fs *FileSystem) ReserveSpaceInFile(offset uint32, size uint32) error {
 
 func (fs *FileSystem) CreateFile(name string, content string) error {
 	if _, err := fs.currentDirectory.GetInode(name); err == nil {
-		return fmt.Errorf("record with name \"%s\" already exists", name)
+		return fmt.Errorf("%w - %s", errs.ErrRecordAlreadyExists, name)
 	}
 
 	blockIndex, inodeIndex, err := fs.CreateFileOrDirectory(true)
@@ -211,7 +212,7 @@ func (fs *FileSystem) CreateFile(name string, content string) error {
 func (fs *FileSystem) CreateDirectory(name string) error {
 	if name != "/" {
 		if _, err := fs.currentDirectory.GetInode(name); err == nil {
-			return fmt.Errorf("record with name \"%s\" already exists", name)
+			return fmt.Errorf("%w - %s", errs.ErrRecordAlreadyExists, name)
 		}
 	}
 
@@ -272,7 +273,7 @@ func (fs *FileSystem) CreateFileOrDirectory(isFile bool) (uint32, uint32, error)
 
 func (fs *FileSystem) DeleteFile(name string, fromDirectory *directory.Directory, fromInode *inode.Inode) error {
 	if name == "." || name == ".." {
-		return fmt.Errorf("illegal argument - %s", name)
+		return fmt.Errorf("%w - %s", errs.ErrIllegalArgument, name)
 	}
 
 	inodeIndex, err := fromDirectory.GetInode(name)
@@ -352,7 +353,7 @@ func (fs *FileSystem) ChangeDirectory(path string) error {
 		}
 
 		if inode.UnpackTypeAndPermissions(dirInode.TypeAndPermissions).IsFile {
-			return fmt.Errorf("record is not a directory - %s", dirName)
+			return fmt.Errorf("%w - %s", errs.ErrRecordIsNotDirectory, dirName)
 		}
 
 		dirOffset := fs.GetDataBlocksOffset() + dirInode.Blocks[0]*fs.Superblock.BlockSize
@@ -386,7 +387,7 @@ func (fs FileSystem) ReadFile(fileName string) (string, error) {
 	}
 
 	if !inode.UnpackTypeAndPermissions(fileInode.TypeAndPermissions).IsFile {
-		return "", fmt.Errorf("record is not a file - %s", fileName)
+		return "", fmt.Errorf("%w - %s", errs.ErrRecordIsNotFile, fileName)
 	}
 
 	blockOffset := fs.GetDataBlocksOffset() + fileInode.Blocks[0]*fs.Superblock.BlockSize
@@ -399,7 +400,7 @@ func (fs FileSystem) ReadFile(fileName string) (string, error) {
 
 	nullIndex := bytes.Index(data, []byte{0})
 	if nullIndex == -1 {
-		return "", fmt.Errorf("null terminator not found in file - %s", fileName)
+		return "", fmt.Errorf("%w - %s", errs.ErrNullNotFound, fileName)
 	}
 
 	str := string(data[:nullIndex])
@@ -419,7 +420,7 @@ func (fs FileSystem) EditFile(name string, content string) error {
 	}
 
 	if !inode.UnpackTypeAndPermissions(fileInode.TypeAndPermissions).IsFile {
-		return fmt.Errorf("record is not a file - %s", name)
+		return fmt.Errorf("%w - %s", errs.ErrRecordIsNotFile, name)
 	}
 
 	blockOffset := fs.GetDataBlocksOffset() + fileInode.Blocks[0]*fs.Superblock.BlockSize

@@ -2,6 +2,7 @@ package directory
 
 import (
 	"encoding/binary"
+	"file-system/internal/errs"
 	"file-system/internal/filesystem/directory/record"
 	"fmt"
 	"io"
@@ -113,5 +114,5 @@ func (d Directory) GetInode(recordName string) (uint32, error) {
 	if exist {
 		return record.Inode, nil
 	}
-	return 0, fmt.Errorf("record not found - %s", recordName)
+	return 0, fmt.Errorf("%w - %s", errs.ErrRecordNotFound, recordName)
 }
