@@ -11,6 +11,7 @@ import (
 
 type Directory struct {
 	records map[string]record.Record
+	keys    []string
 }
 
 func CreateNewDirectory(inode uint32, parentInode uint32) *Directory {
@@ -23,6 +24,7 @@ func CreateNewDirectory(inode uint32, parentInode uint32) *Directory {
 
 	return &Directory{
 		records: records,
+		keys:    []string{".", ".."},
 	}
 }
 
@@ -76,6 +78,7 @@ func ReadDirectoryAt(file *os.File, offset uint32) (*Directory, error) {
 			Name:         name,
 		}
 		directory.records[record.Name] = record
+		directory.keys = append(directory.keys, record.Name)
 	}
 
 	return &directory, nil
@@ -84,14 +87,24 @@ func ReadDirectoryAt(file *os.File, offset uint32) (*Directory, error) {
 func (d *Directory) AddFile(inode uint32, name string) {
 	record := record.NewRecord(inode, name)
 	d.records[record.Name] = record
+	d.keys = append(d.keys, record.Name)
 }
 
 func (d *Directory) DeleteFile(name string) {
 	delete(d.records, name)
+
+	var newKeys []string
+	for _, v := range d.keys {
+		if v != name {
+			newKeys = append(newKeys, v)
+		}
+	}
+	d.keys = newKeys
 }
 
 func (d Directory) WriteAt(file *os.File, offset uint32) error {
-	for _, rec := range d.records {
+	for _, key := range d.keys {
+		rec := d.records[key]
 		err := rec.WriteAt(file, offset)
 		if err != nil {
 			return err
@@ -102,11 +115,7 @@ func (d Directory) WriteAt(file *os.File, offset uint32) error {
 }
 
 func (d Directory) GetRecords() []string {
-	names := make([]string, 0, len(d.records))
-	for name := range d.records {
-		names = append(names, name)
-	}
-	return names
+	return d.keys
 }
 
 func (d Directory) GetInode(recordName string) (uint32, error) {

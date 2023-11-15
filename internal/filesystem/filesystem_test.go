@@ -4,13 +4,16 @@ import (
 	"errors"
 	"file-system/internal/errs"
 	"fmt"
-	"io"
+	"os"
 	"strings"
 	"testing"
 )
 
+const filesystemSize = 1024 * 1024
+const blockSize = 1024
+
 func TestFilesystemIntegration(t *testing.T) {
-	fs, err := FormatFilesystem(1024*1024, 1024)
+	fs, err := FormatFilesystem(filesystemSize, blockSize)
 	if err != nil {
 		t.Fatalf("Failed to create filesystem: %v", err)
 	}
@@ -72,7 +75,7 @@ func TestFilesystemIntegration(t *testing.T) {
 }
 
 func TestDeleteDirectoryWithNestedFiles(t *testing.T) {
-	fs, err := FormatFilesystem(1024*1024, 1024)
+	fs, err := FormatFilesystem(filesystemSize, blockSize)
 	if err != nil {
 		t.Fatalf("Failed to create filesystem: %v", err)
 	}
@@ -110,14 +113,48 @@ func TestDeleteDirectoryWithNestedFiles(t *testing.T) {
 	}
 }
 
-func TestDataFileIdempotency(t *testing.T) {
-	fs, err := FormatFilesystem(1024*1024, 1024)
+func TestDataFileSimpleIdempotency(t *testing.T) {
+	fs, err := FormatFilesystem(filesystemSize, blockSize)
 	if err != nil {
 		t.Fatalf("Failed to create filesystem: %v", err)
 	}
 	defer fs.CloseDataFile()
 
-	savedContent, err := io.ReadAll(fs.dataFile)
+	savedContent, err := os.ReadFile(fs.dataFile.Name())
+	if err != nil {
+		t.Fatalf("Failed to read data file: %v", err)
+	}
+
+	if err = fs.CreateFile("file", "file content"); err != nil {
+		t.Fatalf("Failed to create file: %v", err)
+	}
+
+	if err = fs.DeleteFile("file", fs.currentDirectory, fs.currentDirectoryInode); err != nil {
+		t.Fatalf("Failed to delete file: %v", err)
+	}
+
+	currentContent, err := os.ReadFile(fs.dataFile.Name())
+	if err != nil {
+		t.Fatalf("Failed to read data file: %v", err)
+	}
+
+	diffIndex := findFirstDifference(savedContent, currentContent)
+
+	if diffIndex != -1 {
+		expectedByte := savedContent[diffIndex]
+		gotByte := currentContent[diffIndex]
+		t.Errorf("File content mismatch at byte index %d. Expected: %x, Got: %x", diffIndex, expectedByte, gotByte)
+	}
+}
+
+func TestDataFileComplexIdempotency(t *testing.T) {
+	fs, err := FormatFilesystem(filesystemSize, blockSize)
+	if err != nil {
+		t.Fatalf("Failed to create filesystem: %v", err)
+	}
+	defer fs.CloseDataFile()
+
+	savedContent, err := os.ReadFile(fs.dataFile.Name())
 	if err != nil {
 		t.Fatalf("Failed to read data file: %v", err)
 	}
@@ -148,14 +185,11 @@ func TestDataFileIdempotency(t *testing.T) {
 		t.Fatalf("Failed to delete file: %v", err)
 	}
 
-	currentContent, err := io.ReadAll(fs.dataFile)
+	currentContent, err := os.ReadFile(fs.dataFile.Name())
 	if err != nil {
 		t.Fatalf("Failed to read data file: %v", err)
 	}
 
-	if string(currentContent) != string(savedContent) {
-		t.Errorf("File content mismatch. Expected: %s, Got: %s", savedContent, currentContent)
-	}
 	diffIndex := findFirstDifference(savedContent, currentContent)
 
 	if diffIndex != -1 {

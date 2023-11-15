@@ -324,6 +324,7 @@ func (fs *FileSystem) DeleteFile(name string, fromDirectory *directory.Directory
 	fs.ReserveSpaceInFile(offset, fs.Superblock.InodeSize)
 
 	offset = fs.GetDataBlocksOffset() + fromInode.Blocks[0]*fs.Superblock.BlockSize
+	fs.ReserveSpaceInFile(offset, fs.Superblock.BlockSize)
 	fromDirectory.WriteAt(fs.dataFile, offset)
 
 	fs.BlockBitmap.WriteAt(fs.dataFile, fs.GetBlockBitmapOffset())
