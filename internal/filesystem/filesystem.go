@@ -7,6 +7,7 @@ import (
 	"file-system/internal/filesystem/directory"
 	"file-system/internal/filesystem/inode"
 	"file-system/internal/filesystem/superblock"
+	"file-system/internal/filesystem/user"
 	"file-system/internal/utils"
 	"fmt"
 	"os"
@@ -28,6 +29,7 @@ type FileSystem struct {
 	dataFile              *os.File
 	currentDirectory      *directory.Directory
 	currentDirectoryInode *inode.Inode
+	currentUser           *user.User
 	currentPath           string
 }
 
@@ -98,12 +100,22 @@ func FormatFilesystem(sizeInBytes uint32, blockSize uint32) (*FileSystem, error)
 	inodeTableSize := fs.Superblock.InodeCount * fs.Superblock.InodeSize
 	fs.ReserveSpaceInFile(fs.GetInodeTableOffset(), inodeTableSize+sizeInBytes)
 
+	fs.InitializeFileSystem()
+
+	return &fs, nil
+}
+
+func (fs *FileSystem) InitializeFileSystem() {
 	fs.CreateDirectory("/")
 	fs.currentPath = "/"
 
-	// fs.
+	fs.CreateDirectory(".users")
+	fs.ChangeDirectory(".users")
 
-	return &fs, nil
+	fs.currentUser = user.NewUser("root", "root")
+	fs.CreateFile("root", fs.currentUser.GetUserString())
+
+	fs.ChangeDirectory("..")
 }
 
 func (fs *FileSystem) ReserveSpaceInFile(offset uint32, size uint32) error {
@@ -381,6 +393,10 @@ func (fs FileSystem) EditFile(name string, content string) error {
 
 func (fs FileSystem) GetCurrentPath() string {
 	return fs.currentPath
+}
+
+func (fs FileSystem) GetCurrentUserName() string {
+	return fs.currentUser.Username
 }
 
 func (fs FileSystem) GetBlockBitmapOffset() uint32 {

@@ -36,7 +36,7 @@ func (m Menu) Start() {
 	defer m.fileSystem.CloseDataFile()
 
 	for {
-		fmt.Printf("root@filesystem:%s$ ", m.fileSystem.GetCurrentPath())
+		fmt.Printf("%s@filesystem:%s$ ", m.fileSystem.GetCurrentUserName(), m.fileSystem.GetCurrentPath())
 		scanner := bufio.NewScanner(os.Stdin)
 		scanner.Scan()
 		err := scanner.Err()
