@@ -343,7 +343,7 @@ func (fs *FileSystem) ChangeDirectory(path string) error {
 	currDirInode := fs.currentDirectoryInode
 	currPath := fs.currentPath
 
-	for _, dirName := range dirs {
+	for i, dirName := range dirs {
 		var inodeIndex uint32
 		var err error
 
@@ -352,6 +352,8 @@ func (fs *FileSystem) ChangeDirectory(path string) error {
 			if err != nil {
 				return err
 			}
+		} else if i != 0 {
+			return fmt.Errorf("incorrect path - %s", path)
 		}
 
 		inodeOffset := fs.GetInodeTableOffset() + inodeIndex*fs.Superblock.InodeSize
@@ -372,6 +374,10 @@ func (fs *FileSystem) ChangeDirectory(path string) error {
 
 		currDir = dir
 		currDirInode = dirInode
+
+		if dirName == "" {
+			dirName = "/"
+		}
 		currPath = utils.ChangeDirectoryPath(currPath, dirName)
 	}
 

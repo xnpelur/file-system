@@ -16,6 +16,12 @@ func TestChangeDirectoryPath(t *testing.T) {
 		{"/root", "..", "/"},
 		{"/", "..", "/"},
 		{"/", "home", "/home"},
+		{"/", "/", "/"},
+		{"/home", "/", "/"},
+		{"/home/dir", "/", "/"},
+		{"/home", "/home/dir", "/home/dir"},
+		{"/home/dir", "/home", "/home"},
+		{"/home", "/dir1/dir2", "/dir1/dir2"},
 	}
 
 	for _, test := range tests {
