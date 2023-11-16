@@ -202,7 +202,7 @@ func (fs *FileSystem) CreateDirectory(path string) error {
 		fs.ChangeDirectory(pathToFolder)
 	}
 
-	if name != "/" {
+	if path != "/" {
 		if _, err := fs.currentDirectory.GetInode(name); err == nil {
 			return fmt.Errorf("%w - %s", errs.ErrRecordAlreadyExists, name)
 		}
@@ -214,7 +214,7 @@ func (fs *FileSystem) CreateDirectory(path string) error {
 	}
 
 	var currDirInodeIndex uint32
-	if name != "/" {
+	if path != "/" {
 		currDirInodeIndex, err = fs.currentDirectory.GetInode(".")
 		if err != nil {
 			return err
@@ -224,7 +224,7 @@ func (fs *FileSystem) CreateDirectory(path string) error {
 	newDir := directory.CreateNewDirectory(inodeIndex, currDirInodeIndex)
 	newDir.WriteAt(fs.dataFile, fs.GetDataBlocksOffset()+blockIndex*fs.Superblock.BlockSize)
 
-	if name == "/" {
+	if path == "/" {
 		fs.currentDirectory = newDir
 		inodeOffset := fs.GetInodeTableOffset() + fs.Superblock.InodeSize*inodeIndex
 		fs.currentDirectoryInode, err = inode.ReadInodeAt(fs.dataFile, inodeOffset)
@@ -234,11 +234,11 @@ func (fs *FileSystem) CreateDirectory(path string) error {
 	} else {
 		fs.currentDirectory.AddFile(inodeIndex, name)
 		fs.currentDirectory.WriteAt(fs.dataFile, fs.GetDataBlocksOffset()+fs.currentDirectoryInode.Blocks[0]*fs.Superblock.BlockSize)
-	}
 
-	fs.currentDirectory = currDir
-	fs.currentDirectoryInode = currDirInode
-	fs.currentPath = currPath
+		fs.currentDirectory = currDir
+		fs.currentDirectoryInode = currDirInode
+		fs.currentPath = currPath
+	}
 
 	return nil
 }
@@ -336,6 +336,7 @@ func (fs *FileSystem) DeleteFile(name string, fromDirectory *directory.Directory
 }
 
 func (fs *FileSystem) ChangeDirectory(path string) error {
+	path = strings.TrimSuffix(path, "/")
 	dirs := strings.Split(path, "/")
 
 	currDir := fs.currentDirectory
@@ -343,9 +344,14 @@ func (fs *FileSystem) ChangeDirectory(path string) error {
 	currPath := fs.currentPath
 
 	for _, dirName := range dirs {
-		inodeIndex, err := currDir.GetInode(dirName)
-		if err != nil {
-			return err
+		var inodeIndex uint32
+		var err error
+
+		if dirName != "" {
+			inodeIndex, err = currDir.GetInode(dirName)
+			if err != nil {
+				return err
+			}
 		}
 
 		inodeOffset := fs.GetInodeTableOffset() + inodeIndex*fs.Superblock.InodeSize

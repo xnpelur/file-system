@@ -30,6 +30,10 @@ func StringToByteBlock(str string, blockSize uint32) []byte {
 }
 
 func ChangeDirectoryPath(currentPath, arg string) string {
+	if arg == "/" {
+		return "/"
+	}
+
 	currentPath = strings.Trim(currentPath, "/")
 	currentDirs := strings.Split(currentPath, "/")
 
