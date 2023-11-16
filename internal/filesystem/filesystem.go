@@ -111,34 +111,19 @@ func (fs *FileSystem) InitializeFileSystem() {
 	fs.currentPath = "/"
 
 	fs.CreateDirectory(".users")
-	fs.ChangeDirectory(".users")
 
 	fs.currentUser = user.NewUser("root", "root")
-	fs.CreateFile("root", fs.currentUser.GetUserString())
-
-	fs.ChangeDirectory("..")
+	fs.CreateFile("/.users/root", fs.currentUser.GetUserString())
 }
 
 func (fs *FileSystem) ChangeUser(username string) error {
-	if fs.currentPath != "/" {
-		return fmt.Errorf("not implemented yet")
-	}
-	err := fs.ChangeDirectory(".users")
-	if err != nil {
-		return err
-	}
-
-	content, err := fs.ReadFile(username)
+	content, err := fs.ReadFile(fmt.Sprintf("/.users/%s", username))
 	if err != nil {
 		return err
 	}
 
 	fs.currentUser, err = user.ReadUserFromString(content)
-	if err != nil {
-		return err
-	}
-
-	return fs.ChangeDirectory("..")
+	return err
 }
 
 func (fs *FileSystem) ReserveSpaceInFile(offset uint32, size uint32) error {

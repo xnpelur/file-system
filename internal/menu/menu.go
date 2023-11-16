@@ -125,6 +125,11 @@ func (m *Menu) executeCommand(command string, args []string) error {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
 		return m.fileSystem.ChangeDirectory(args[0])
+	case "changeuser":
+		if len(args) < 1 {
+			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
+		}
+		return m.fileSystem.ChangeUser(args[0])
 	default:
 		return fmt.Errorf("%w - %s", errs.ErrUnknownCommand, command)
 	}
