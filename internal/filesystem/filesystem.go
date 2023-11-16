@@ -380,8 +380,17 @@ func (fs FileSystem) GetCurrentDirectoryRecords() []string {
 	return fs.currentDirectory.GetRecords()
 }
 
-func (fs FileSystem) ReadFile(fileName string) (string, error) {
-	inodeIndex, err := fs.currentDirectory.GetInode(fileName)
+func (fs FileSystem) ReadFile(path string) (string, error) {
+	currDir := fs.currentDirectory
+	currDirInode := fs.currentDirectoryInode
+	currPath := fs.currentPath
+
+	pathToFolder, name := utils.SplitPath(path)
+	if pathToFolder != "" {
+		fs.ChangeDirectory(pathToFolder)
+	}
+
+	inodeIndex, err := fs.currentDirectory.GetInode(name)
 	if err != nil {
 		return "", err
 	}
@@ -393,7 +402,7 @@ func (fs FileSystem) ReadFile(fileName string) (string, error) {
 	}
 
 	if !inode.UnpackTypeAndPermissions(fileInode.TypeAndPermissions).IsFile {
-		return "", fmt.Errorf("%w - %s", errs.ErrRecordIsNotFile, fileName)
+		return "", fmt.Errorf("%w - %s", errs.ErrRecordIsNotFile, name)
 	}
 
 	blockOffset := fs.GetDataBlocksOffset() + fileInode.Blocks[0]*fs.Superblock.BlockSize
@@ -406,10 +415,15 @@ func (fs FileSystem) ReadFile(fileName string) (string, error) {
 
 	nullIndex := bytes.Index(data, []byte{0})
 	if nullIndex == -1 {
-		return "", fmt.Errorf("%w - %s", errs.ErrNullNotFound, fileName)
+		return "", fmt.Errorf("%w - %s", errs.ErrNullNotFound, name)
 	}
 
 	str := string(data[:nullIndex])
+
+	fs.currentDirectory = currDir
+	fs.currentDirectoryInode = currDirInode
+	fs.currentPath = currPath
+
 	return str, nil
 }
 
