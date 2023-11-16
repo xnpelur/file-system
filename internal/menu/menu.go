@@ -79,6 +79,10 @@ func (m *Menu) executeCommand(command string, args []string) error {
 			return fmt.Errorf("%w - %s", errs.ErrIncorrectFileName, fileName)
 		}
 
+		if strings.HasSuffix(fileName, "/") {
+			return m.fileSystem.CreateDirectory(fileName[:len(fileName)-1])
+		}
+
 		fileContent := ""
 		if len(args) > 1 {
 			fileContent = args[1]
