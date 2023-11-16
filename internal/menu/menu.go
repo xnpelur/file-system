@@ -44,7 +44,7 @@ func (m Menu) Start() {
 			log.Fatal(err)
 		}
 		input := scanner.Text()
-		parts := parseCommand(input)
+		parts := parseCommandLine(input)
 
 		if parts[0] == "exit" {
 			fmt.Println("File system closed.")
@@ -134,36 +134,56 @@ func (m *Menu) executeCommand(command string, args []string) error {
 	}
 }
 
-func parseCommand(input string) []string {
-	var parts []string
-	var currentPart string
-	inQuotes := false
-
-	for _, part := range strings.Fields(input) {
-		if strings.HasPrefix(part, `"`) {
-			if strings.HasSuffix(part, `"`) {
-				parts = append(parts, part[1:len(part)-1])
-				continue
+func parseCommandLine(command string) []string {
+	var args []string
+	state := "start"
+	current := ""
+	quote := "\""
+	escapeNext := true
+	for _, c := range command {
+		if state == "quotes" {
+			if string(c) != quote {
+				current += string(c)
+			} else {
+				args = append(args, current)
+				current = ""
+				state = "start"
 			}
-			inQuotes = true
-			currentPart = part[1:]
-		} else if strings.HasSuffix(part, `"`) {
-			inQuotes = false
-			currentPart += " " + part[:len(part)-1]
-			parts = append(parts, currentPart)
-			currentPart = ""
-		} else if inQuotes {
-			currentPart += " " + part
-		} else {
-			parts = append(parts, part)
+			continue
+		}
+		if escapeNext {
+			current += string(c)
+			escapeNext = false
+			continue
+		}
+		if c == '\\' {
+			escapeNext = true
+			continue
+		}
+		if c == '"' || c == '\'' {
+			state = "quotes"
+			quote = string(c)
+			continue
+		}
+		if state == "arg" {
+			if c == ' ' || c == '\t' {
+				args = append(args, current)
+				current = ""
+				state = "start"
+			} else {
+				current += string(c)
+			}
+			continue
+		}
+		if c != ' ' && c != '\t' {
+			state = "arg"
+			current += string(c)
 		}
 	}
-
-	if len(currentPart) > 0 {
-		parts = append(parts, currentPart)
+	if current != "" {
+		args = append(args, current)
 	}
-
-	return parts
+	return args
 }
 
 func getYesOrNo(prompt string) bool {

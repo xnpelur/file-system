@@ -23,6 +23,14 @@ func TestParseCommand(t *testing.T) {
 			expected: []string{"create", "file", "hello"},
 		},
 		{
+			input:    "create file \" hello\"",
+			expected: []string{"create", "file", " hello"},
+		},
+		{
+			input:    "create file \" hello \"",
+			expected: []string{"create", "file", " hello "},
+		},
+		{
 			input:    "command \"first argument\" \"second argument\" \"incorrect argument",
 			expected: []string{"command", "first argument", "second argument", "incorrect argument"},
 		},
@@ -30,7 +38,7 @@ func TestParseCommand(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.input, func(t *testing.T) {
-			parts := parseCommand(tc.input)
+			parts := parseCommandLine(tc.input)
 
 			if !reflect.DeepEqual(parts, tc.expected) {
 				t.Errorf("Input: %s\nExpected: %v\nActual: %v", tc.input, tc.expected, parts)
