@@ -104,73 +104,6 @@ func FormatFilesystem(sizeInBytes uint32, blockSize uint32) (*FileSystem, error)
 	return &fileSystem, nil
 }
 
-func (fs *FileSystem) ExecuteCommand(command string, args []string) error {
-	switch command {
-	case "create":
-		if len(args) < 1 {
-			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
-		}
-		fileName := args[0]
-
-		slashCount := strings.Count(fileName, "/")
-		if slashCount > 0 {
-			if slashCount == 1 && strings.HasSuffix(fileName, "/") {
-				return fs.CreateDirectory(fileName[:len(fileName)-1])
-			}
-			return fmt.Errorf("%w - %s", errs.ErrIncorrectFileName, fileName)
-		}
-
-		if strings.HasSuffix(fileName, ".") {
-			return fmt.Errorf("%w - %s", errs.ErrIncorrectFileName, fileName)
-		}
-
-		fileContent := ""
-		if len(args) > 1 {
-			fileContent = args[1]
-		}
-		return fs.CreateFile(fileName, fileContent)
-	case "edit":
-		if len(args) < 1 {
-			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
-		}
-		fileName := args[0]
-		fileContent := ""
-		if len(args) > 1 {
-			fileContent = args[1]
-		}
-		return fs.EditFile(fileName, fileContent)
-	case "read":
-		if len(args) < 1 {
-			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
-		}
-		fileName := args[0]
-		content, err := fs.ReadFile(fileName)
-		if err != nil {
-			return err
-		}
-		fmt.Println(content)
-		return nil
-	case "delete":
-		if len(args) < 1 {
-			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
-		}
-		fileName := args[0]
-		return fs.DeleteFile(fileName, fs.currentDirectory, fs.currentDirectoryInode)
-	case "list":
-		for _, name := range fs.currentDirectory.GetRecords() {
-			fmt.Println(name)
-		}
-		return nil
-	case "cd":
-		if len(args) < 1 {
-			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
-		}
-		return fs.ChangeDirectory(args[0])
-	default:
-		return fmt.Errorf("%w - %s", errs.ErrUnknownCommand, command)
-	}
-}
-
 func (fs *FileSystem) ReserveSpaceInFile(offset uint32, size uint32) error {
 	data := make([]byte, size)
 
@@ -276,6 +209,11 @@ func (fs *FileSystem) DeleteFile(name string, fromDirectory *directory.Directory
 		return fmt.Errorf("%w - %s", errs.ErrIllegalArgument, name)
 	}
 
+	if fromDirectory == nil || fromInode == nil {
+		fromDirectory = fs.currentDirectory
+		fromInode = fs.currentDirectoryInode
+	}
+
 	inodeIndex, err := fromDirectory.GetInode(name)
 	if err != nil {
 		return err
@@ -373,6 +311,10 @@ func (fs *FileSystem) ChangeDirectory(path string) error {
 	fs.currentPath = currPath
 
 	return nil
+}
+
+func (fs FileSystem) GetCurrentDirectoryRecords() []string {
+	return fs.currentDirectory.GetRecords()
 }
 
 func (fs FileSystem) ReadFile(fileName string) (string, error) {

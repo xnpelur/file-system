@@ -2,6 +2,7 @@ package menu
 
 import (
 	"bufio"
+	"file-system/internal/errs"
 	"file-system/internal/filesystem"
 	"fmt"
 	"log"
@@ -58,11 +59,78 @@ func (m Menu) Start() {
 				fmt.Println("Файловая система форматирована.")
 			}
 		} else {
-			err := m.fileSystem.ExecuteCommand(parts[0], parts[1:])
+			err := m.executeCommand(parts[0], parts[1:])
 			if err != nil {
 				fmt.Printf("Error: %s\n", err.Error())
 			}
 		}
+	}
+}
+
+func (m *Menu) executeCommand(command string, args []string) error {
+	switch command {
+	case "create":
+		if len(args) < 1 {
+			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
+		}
+		fileName := args[0]
+
+		slashCount := strings.Count(fileName, "/")
+		if slashCount > 0 {
+			if slashCount == 1 && strings.HasSuffix(fileName, "/") {
+				return m.fileSystem.CreateDirectory(fileName[:len(fileName)-1])
+			}
+			return fmt.Errorf("%w - %s", errs.ErrIncorrectFileName, fileName)
+		}
+
+		if strings.HasSuffix(fileName, ".") {
+			return fmt.Errorf("%w - %s", errs.ErrIncorrectFileName, fileName)
+		}
+
+		fileContent := ""
+		if len(args) > 1 {
+			fileContent = args[1]
+		}
+		return m.fileSystem.CreateFile(fileName, fileContent)
+	case "edit":
+		if len(args) < 1 {
+			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
+		}
+		fileName := args[0]
+		fileContent := ""
+		if len(args) > 1 {
+			fileContent = args[1]
+		}
+		return m.fileSystem.EditFile(fileName, fileContent)
+	case "read":
+		if len(args) < 1 {
+			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
+		}
+		fileName := args[0]
+		content, err := m.fileSystem.ReadFile(fileName)
+		if err != nil {
+			return err
+		}
+		fmt.Println(content)
+		return nil
+	case "delete":
+		if len(args) < 1 {
+			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
+		}
+		fileName := args[0]
+		return m.fileSystem.DeleteFile(fileName, nil, nil)
+	case "list":
+		for _, name := range m.fileSystem.GetCurrentDirectoryRecords() {
+			fmt.Println(name)
+		}
+		return nil
+	case "cd":
+		if len(args) < 1 {
+			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
+		}
+		return m.fileSystem.ChangeDirectory(args[0])
+	default:
+		return fmt.Errorf("%w - %s", errs.ErrUnknownCommand, command)
 	}
 }
 
