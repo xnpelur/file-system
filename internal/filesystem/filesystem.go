@@ -32,76 +32,78 @@ type FileSystem struct {
 }
 
 func OpenFilesystem() (*FileSystem, error) {
-	fileSystem := FileSystem{}
+	fs := FileSystem{}
 
 	var err error
-	fileSystem.dataFile, err = os.OpenFile(FilesystemConfig.FileName, os.O_RDWR, 0666)
+	fs.dataFile, err = os.OpenFile(FilesystemConfig.FileName, os.O_RDWR, 0666)
 	if err != nil {
 		return nil, err
 	}
 
-	fileSystem.Superblock, err = superblock.ReadSuperblockAt(fileSystem.dataFile, 0)
+	fs.Superblock, err = superblock.ReadSuperblockAt(fs.dataFile, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	fileSystem.BlockBitmap, err = bitmap.ReadBitmapAt(
-		fileSystem.dataFile,
-		fileSystem.GetBlockBitmapOffset(),
-		fileSystem.Superblock.BlockCount,
+	fs.BlockBitmap, err = bitmap.ReadBitmapAt(
+		fs.dataFile,
+		fs.GetBlockBitmapOffset(),
+		fs.Superblock.BlockCount,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	fileSystem.InodeBitmap, err = bitmap.ReadBitmapAt(
-		fileSystem.dataFile,
-		fileSystem.GetInodeBitmapOffset(),
-		fileSystem.Superblock.InodeCount,
+	fs.InodeBitmap, err = bitmap.ReadBitmapAt(
+		fs.dataFile,
+		fs.GetInodeBitmapOffset(),
+		fs.Superblock.InodeCount,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	fileSystem.currentDirectoryInode, err = inode.ReadInodeAt(fileSystem.dataFile, fileSystem.GetInodeTableOffset())
+	fs.currentDirectoryInode, err = inode.ReadInodeAt(fs.dataFile, fs.GetInodeTableOffset())
 	if err != nil {
 		return nil, err
 	}
 
-	dirOffset := fileSystem.GetDataBlocksOffset() + fileSystem.currentDirectoryInode.Blocks[0]*fileSystem.Superblock.BlockSize
-	fileSystem.currentDirectory, err = directory.ReadDirectoryAt(fileSystem.dataFile, dirOffset)
+	dirOffset := fs.GetDataBlocksOffset() + fs.currentDirectoryInode.Blocks[0]*fs.Superblock.BlockSize
+	fs.currentDirectory, err = directory.ReadDirectoryAt(fs.dataFile, dirOffset)
 	if err != nil {
 		return nil, err
 	}
 
-	fileSystem.currentPath = "/"
+	fs.currentPath = "/"
 
-	return &fileSystem, nil
+	return &fs, nil
 }
 
 func FormatFilesystem(sizeInBytes uint32, blockSize uint32) (*FileSystem, error) {
-	fileSystem := FileSystem{}
-	fileSystem.Superblock = superblock.NewSuperblock(sizeInBytes, blockSize)
-	fileSystem.BlockBitmap = bitmap.NewBitmap(fileSystem.Superblock.BlockCount)
-	fileSystem.InodeBitmap = bitmap.NewBitmap(fileSystem.Superblock.InodeCount)
+	fs := FileSystem{}
+	fs.Superblock = superblock.NewSuperblock(sizeInBytes, blockSize)
+	fs.BlockBitmap = bitmap.NewBitmap(fs.Superblock.BlockCount)
+	fs.InodeBitmap = bitmap.NewBitmap(fs.Superblock.InodeCount)
 
 	var err error
-	fileSystem.dataFile, err = os.Create(FilesystemConfig.FileName)
+	fs.dataFile, err = os.Create(FilesystemConfig.FileName)
 	if err != nil {
 		return nil, err
 	}
 
-	fileSystem.Superblock.WriteAt(fileSystem.dataFile, 0)
-	fileSystem.BlockBitmap.WriteAt(fileSystem.dataFile, fileSystem.GetBlockBitmapOffset())
-	fileSystem.InodeBitmap.WriteAt(fileSystem.dataFile, fileSystem.GetInodeBitmapOffset())
+	fs.Superblock.WriteAt(fs.dataFile, 0)
+	fs.BlockBitmap.WriteAt(fs.dataFile, fs.GetBlockBitmapOffset())
+	fs.InodeBitmap.WriteAt(fs.dataFile, fs.GetInodeBitmapOffset())
 
-	inodeTableSize := fileSystem.Superblock.InodeCount * fileSystem.Superblock.InodeSize
-	fileSystem.ReserveSpaceInFile(fileSystem.GetInodeTableOffset(), inodeTableSize+sizeInBytes)
+	inodeTableSize := fs.Superblock.InodeCount * fs.Superblock.InodeSize
+	fs.ReserveSpaceInFile(fs.GetInodeTableOffset(), inodeTableSize+sizeInBytes)
 
-	fileSystem.CreateDirectory("/")
-	fileSystem.currentPath = "/"
+	fs.CreateDirectory("/")
+	fs.currentPath = "/"
 
-	return &fileSystem, nil
+	// fs.
+
+	return &fs, nil
 }
 
 func (fs *FileSystem) ReserveSpaceInFile(offset uint32, size uint32) error {
