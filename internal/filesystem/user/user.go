@@ -4,6 +4,8 @@ import (
 	"crypto/sha512"
 	"encoding/hex"
 	"fmt"
+	"strconv"
+	"strings"
 )
 
 type User struct {
@@ -20,6 +22,31 @@ func NewUser(username, password string) *User {
 		GroupId:      0,
 		PasswordHash: hashPassword(password),
 	}
+}
+
+func ReadUserFromString(str string) (*User, error) {
+	parts := strings.Fields(str)
+
+	if len(parts) < 4 {
+		return nil, fmt.Errorf("invalid input format")
+	}
+
+	userId, err := strconv.ParseUint(parts[1], 10, 16)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing UserId: %v", err)
+	}
+
+	groupId, err := strconv.ParseUint(parts[2], 10, 16)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing GroupId: %v", err)
+	}
+
+	return &User{
+		Username:     parts[0],
+		UserId:       uint16(userId),
+		GroupId:      uint16(groupId),
+		PasswordHash: parts[3],
+	}, nil
 }
 
 func (u User) GetUserString() string {

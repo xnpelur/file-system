@@ -77,6 +77,7 @@ func OpenFilesystem() (*FileSystem, error) {
 	}
 
 	fs.currentPath = "/"
+	fs.ChangeUser("root")
 
 	return &fs, nil
 }
@@ -118,6 +119,28 @@ func (fs *FileSystem) InitializeFileSystem() {
 	fs.ChangeDirectory("..")
 }
 
+func (fs *FileSystem) ChangeUser(username string) error {
+	if fs.currentPath != "/" {
+		return fmt.Errorf("not implemented yet")
+	}
+	err := fs.ChangeDirectory(".users")
+	if err != nil {
+		return err
+	}
+
+	content, err := fs.ReadFile(username)
+	if err != nil {
+		return err
+	}
+
+	fs.currentUser, err = user.ReadUserFromString(content)
+	if err != nil {
+		return err
+	}
+
+	return fs.ChangeDirectory("..")
+}
+
 func (fs *FileSystem) ReserveSpaceInFile(offset uint32, size uint32) error {
 	data := make([]byte, size)
 
@@ -129,7 +152,16 @@ func (fs *FileSystem) ReserveSpaceInFile(offset uint32, size uint32) error {
 	return nil
 }
 
-func (fs *FileSystem) CreateFile(name string, content string) error {
+func (fs *FileSystem) CreateFile(path string, content string) error {
+	currDir := fs.currentDirectory
+	currDirInode := fs.currentDirectoryInode
+	currPath := fs.currentPath
+
+	pathToFolder, name := utils.SplitPath(path)
+	if pathToFolder != "" {
+		fs.ChangeDirectory(pathToFolder)
+	}
+
 	if _, err := fs.currentDirectory.GetInode(name); err == nil {
 		return fmt.Errorf("%w - %s", errs.ErrRecordAlreadyExists, name)
 	}
@@ -152,6 +184,10 @@ func (fs *FileSystem) CreateFile(name string, content string) error {
 			return err
 		}
 	}
+
+	fs.currentDirectory = currDir
+	fs.currentDirectoryInode = currDirInode
+	fs.currentPath = currPath
 
 	return nil
 }

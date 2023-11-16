@@ -53,3 +53,16 @@ func ChangeDirectoryPath(currentPath, arg string) string {
 
 	return "/" + strings.Join(currentDirs, "/")
 }
+
+func SplitPath(input string) (string, string) {
+	index := strings.LastIndex(input, "/")
+
+	if index == -1 {
+		return "", input
+	}
+
+	firstPart := input[:index]
+	secondPart := input[index+1:]
+
+	return firstPart, secondPart
+}

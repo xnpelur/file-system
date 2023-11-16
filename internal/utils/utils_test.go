@@ -25,3 +25,22 @@ func TestChangeDirectoryPath(t *testing.T) {
 		}
 	}
 }
+
+func TestSplitPath(t *testing.T) {
+	tests := []struct {
+		input        string
+		pathToFolder string
+		fileName     string
+	}{
+		{"/home/user/document.txt", "/home/user", "document.txt"},
+		{"dir1/dir2/file.txt", "dir1/dir2", "file.txt"},
+		{"file", "", "file"},
+	}
+
+	for _, test := range tests {
+		pathToFolder, fileName := SplitPath(test.input)
+		if pathToFolder != test.pathToFolder || fileName != test.fileName {
+			t.Errorf("For %s, expected %s and %s, but got %s and %s", test.input, test.pathToFolder, test.fileName, pathToFolder, fileName)
+		}
+	}
+}

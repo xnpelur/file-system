@@ -75,14 +75,6 @@ func (m *Menu) executeCommand(command string, args []string) error {
 		}
 		fileName := args[0]
 
-		slashCount := strings.Count(fileName, "/")
-		if slashCount > 0 {
-			if slashCount == 1 && strings.HasSuffix(fileName, "/") {
-				return m.fileSystem.CreateDirectory(fileName[:len(fileName)-1])
-			}
-			return fmt.Errorf("%w - %s", errs.ErrIncorrectFileName, fileName)
-		}
-
 		if strings.HasSuffix(fileName, ".") {
 			return fmt.Errorf("%w - %s", errs.ErrIncorrectFileName, fileName)
 		}
