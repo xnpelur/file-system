@@ -13,11 +13,8 @@ const filesystemSize = 1024 * 1024
 const blockSize = 1024
 
 func TestFilesystemIntegration(t *testing.T) {
-	fs, err := FormatFilesystem(filesystemSize, blockSize)
-	if err != nil {
-		t.Fatalf("Failed to create filesystem: %v", err)
-	}
-	defer fs.CloseDataFile()
+	fs, cleanup := setupFilesystem(t)
+	t.Cleanup(cleanup)
 
 	const fileContent = "Hello, World!"
 	const updatedFileContent = "Updated file content"
@@ -75,13 +72,11 @@ func TestFilesystemIntegration(t *testing.T) {
 }
 
 func TestDeleteDirectoryWithNestedFiles(t *testing.T) {
-	fs, err := FormatFilesystem(filesystemSize, blockSize)
-	if err != nil {
-		t.Fatalf("Failed to create filesystem: %v", err)
-	}
-	defer fs.CloseDataFile()
+	fs, cleanup := setupFilesystem(t)
+	t.Cleanup(cleanup)
 
 	nestingLevel := 10
+	var err error
 
 	for i := 1; i <= nestingLevel; i++ {
 		fileName := fmt.Sprintf("file%d", i)
@@ -114,11 +109,8 @@ func TestDeleteDirectoryWithNestedFiles(t *testing.T) {
 }
 
 func TestDataFileSimpleIdempotency(t *testing.T) {
-	fs, err := FormatFilesystem(filesystemSize, blockSize)
-	if err != nil {
-		t.Fatalf("Failed to create filesystem: %v", err)
-	}
-	defer fs.CloseDataFile()
+	fs, cleanup := setupFilesystem(t)
+	t.Cleanup(cleanup)
 
 	savedContent, err := os.ReadFile(fs.dataFile.Name())
 	if err != nil {
@@ -148,11 +140,8 @@ func TestDataFileSimpleIdempotency(t *testing.T) {
 }
 
 func TestDataFileComplexIdempotency(t *testing.T) {
-	fs, err := FormatFilesystem(filesystemSize, blockSize)
-	if err != nil {
-		t.Fatalf("Failed to create filesystem: %v", err)
-	}
-	defer fs.CloseDataFile()
+	fs, cleanup := setupFilesystem(t)
+	t.Cleanup(cleanup)
 
 	savedContent, err := os.ReadFile(fs.dataFile.Name())
 	if err != nil {
@@ -197,6 +186,25 @@ func TestDataFileComplexIdempotency(t *testing.T) {
 		gotByte := currentContent[diffIndex]
 		t.Errorf("File content mismatch at byte index %d. Expected: %x, Got: %x", diffIndex, expectedByte, gotByte)
 	}
+}
+
+func setupFilesystem(t *testing.T) (*FileSystem, func()) {
+	fs, err := FormatFilesystem(filesystemSize, blockSize)
+	if err != nil {
+		t.Fatalf("Failed to create filesystem: %v", err)
+	}
+
+	cleanup := func() {
+		if err := fs.CloseDataFile(); err != nil {
+			t.Errorf("Error closing data file: %v", err)
+		}
+
+		if err := os.Remove(fs.dataFile.Name()); err != nil {
+			t.Errorf("Error removing file: %v", err)
+		}
+	}
+
+	return fs, cleanup
 }
 
 func findFirstDifference(slice1, slice2 []byte) int {
