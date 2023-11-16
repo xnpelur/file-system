@@ -192,7 +192,16 @@ func (fs *FileSystem) CreateFile(path string, content string) error {
 	return nil
 }
 
-func (fs *FileSystem) CreateDirectory(name string) error {
+func (fs *FileSystem) CreateDirectory(path string) error {
+	currDir := fs.currentDirectory
+	currDirInode := fs.currentDirectoryInode
+	currPath := fs.currentPath
+
+	pathToFolder, name := utils.SplitPath(path)
+	if pathToFolder != "" {
+		fs.ChangeDirectory(pathToFolder)
+	}
+
 	if name != "/" {
 		if _, err := fs.currentDirectory.GetInode(name); err == nil {
 			return fmt.Errorf("%w - %s", errs.ErrRecordAlreadyExists, name)
@@ -226,6 +235,10 @@ func (fs *FileSystem) CreateDirectory(name string) error {
 		fs.currentDirectory.AddFile(inodeIndex, name)
 		fs.currentDirectory.WriteAt(fs.dataFile, fs.GetDataBlocksOffset()+fs.currentDirectoryInode.Blocks[0]*fs.Superblock.BlockSize)
 	}
+
+	fs.currentDirectory = currDir
+	fs.currentDirectoryInode = currDirInode
+	fs.currentPath = currPath
 
 	return nil
 }
