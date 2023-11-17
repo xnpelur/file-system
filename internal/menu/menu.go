@@ -130,6 +130,11 @@ func (m *Menu) executeCommand(command string, args []string) error {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
 		return m.fileSystem.ChangeUser(args[0])
+	case "adduser":
+		if len(args) < 2 {
+			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
+		}
+		return m.fileSystem.AddUser(args[0], args[1])
 	default:
 		return fmt.Errorf("%w - %s", errs.ErrUnknownCommand, command)
 	}

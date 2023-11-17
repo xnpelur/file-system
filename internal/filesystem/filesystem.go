@@ -112,8 +112,13 @@ func (fs *FileSystem) InitializeFileSystem() {
 
 	fs.CreateDirectory(".users")
 
-	fs.currentUser = user.NewUser("root", "root")
-	fs.CreateFile("/.users/root", fs.currentUser.GetUserString())
+	fs.AddUser("root", "root")
+	fs.ChangeUser("root")
+}
+
+func (fs *FileSystem) AddUser(username, password string) error {
+	newUser := user.NewUser(username, password)
+	return fs.CreateFile(fmt.Sprintf("/.users/%s", username), newUser.GetUserString())
 }
 
 func (fs *FileSystem) ChangeUser(username string) error {
