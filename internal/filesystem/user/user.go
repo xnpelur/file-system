@@ -3,6 +3,7 @@ package user
 import (
 	"crypto/sha512"
 	"encoding/hex"
+	"file-system/internal/errs"
 	"fmt"
 	"strconv"
 	"strings"
@@ -24,7 +25,7 @@ func NewUser(username, password string) *User {
 	}
 }
 
-func ReadUserFromString(str string) (*User, error) {
+func ReadUserFromString(str, password string) (*User, error) {
 	parts := strings.Fields(str)
 
 	if len(parts) < 4 {
@@ -41,12 +42,18 @@ func ReadUserFromString(str string) (*User, error) {
 		return nil, fmt.Errorf("error parsing GroupId: %v", err)
 	}
 
-	return &User{
+	u := &User{
 		Username:     parts[0],
 		UserId:       uint16(userId),
 		GroupId:      uint16(groupId),
 		PasswordHash: parts[3],
-	}, nil
+	}
+
+	if hashPassword(password) != u.PasswordHash {
+		return nil, fmt.Errorf("%w - %s", errs.ErrIncorrectPassword, password)
+	}
+
+	return u, nil
 }
 
 func (u User) GetUserString() string {

@@ -2,6 +2,7 @@ package menu
 
 import (
 	"bufio"
+	"errors"
 	"file-system/internal/errs"
 	"file-system/internal/filesystem"
 	"fmt"
@@ -126,10 +127,22 @@ func (m *Menu) executeCommand(command string, args []string) error {
 		}
 		return m.fileSystem.ChangeDirectory(args[0])
 	case "changeuser":
-		if len(args) < 1 {
+		if len(args) < 2 {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
-		return m.fileSystem.ChangeUser(args[0])
+		err := m.fileSystem.ChangeUser(args[0], args[1])
+		if err != nil {
+			if errors.Is(err, errs.ErrIncorrectPassword) {
+				fmt.Println("Неправильный пароль")
+				return nil
+			}
+			if errors.Is(err, errs.ErrRecordNotFound) {
+				fmt.Println("Пользователя с таким именем не существует")
+				return nil
+			}
+			return err
+		}
+		return nil
 	case "adduser":
 		if len(args) < 2 {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)

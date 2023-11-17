@@ -77,7 +77,7 @@ func OpenFilesystem() (*FileSystem, error) {
 	}
 
 	fs.currentPath = "/"
-	fs.ChangeUser("root")
+	fs.ChangeUser("root", "root")
 
 	return &fs, nil
 }
@@ -113,7 +113,7 @@ func (fs *FileSystem) InitializeFileSystem() {
 	fs.CreateDirectory(".users")
 
 	fs.AddUser("root", "root")
-	fs.ChangeUser("root")
+	fs.ChangeUser("root", "root")
 }
 
 func (fs *FileSystem) AddUser(username, password string) error {
@@ -121,14 +121,19 @@ func (fs *FileSystem) AddUser(username, password string) error {
 	return fs.CreateFile(fmt.Sprintf("/.users/%s", username), newUser.GetUserString())
 }
 
-func (fs *FileSystem) ChangeUser(username string) error {
+func (fs *FileSystem) ChangeUser(username, password string) error {
 	content, err := fs.ReadFile(fmt.Sprintf("/.users/%s", username))
 	if err != nil {
 		return err
 	}
 
-	fs.currentUser, err = user.ReadUserFromString(content)
-	return err
+	u, err := user.ReadUserFromString(content, password)
+	if err != nil {
+		return err
+	}
+
+	fs.currentUser = u
+	return nil
 }
 
 func (fs *FileSystem) ReserveSpaceInFile(offset uint32, size uint32) error {
