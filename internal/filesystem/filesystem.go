@@ -255,7 +255,7 @@ func (fs *FileSystem) CreateFileOrDirectory(isFile bool) (uint32, uint32, error)
 	fs.BlockBitmap.WriteAt(fs.dataFile, fs.GetBlockBitmapOffset())
 	fs.InodeBitmap.WriteAt(fs.dataFile, fs.GetInodeBitmapOffset())
 
-	fileInode := inode.NewInode(isFile, 777, 0, 0, []uint32{blockIndex})
+	fileInode := inode.NewInode(isFile, 644, 0, 0, []uint32{blockIndex})
 	inodeOffset := fs.GetInodeTableOffset() + fs.Superblock.InodeSize*inodeIndex
 	fileInode.WriteAt(fs.dataFile, inodeOffset)
 
@@ -383,8 +383,23 @@ func (fs *FileSystem) ChangeDirectory(path string) error {
 	return nil
 }
 
-func (fs FileSystem) GetCurrentDirectoryRecords() []string {
-	return fs.currentDirectory.GetRecords()
+func (fs FileSystem) GetCurrentDirectoryRecords(long bool) []string {
+	if !long {
+		return fs.currentDirectory.GetRecords()
+	}
+
+	recordNames := fs.currentDirectory.GetRecords()
+
+	result := make([]string, len(recordNames))
+	for i, name := range recordNames {
+		recordInodeIndex, _ := fs.currentDirectory.GetInode(name)
+		offset := fs.GetInodeTableOffset() + recordInodeIndex*fs.Superblock.InodeSize
+		recordInode, _ := inode.ReadInodeAt(fs.dataFile, offset)
+		tapString := recordInode.GetTypeAndPermissionString()
+		result[i] = fmt.Sprintf("%s %d %d %s", tapString, recordInode.UserId, recordInode.GroupId, name)
+	}
+
+	return result
 }
 
 func (fs FileSystem) ReadFile(path string) (string, error) {

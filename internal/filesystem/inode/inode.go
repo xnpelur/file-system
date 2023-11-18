@@ -5,6 +5,7 @@ import (
 	"file-system/internal/utils"
 	"io"
 	"os"
+	"strings"
 )
 
 type Inode struct {
@@ -161,6 +162,44 @@ func decodeInode(data []byte) *Inode {
 	}
 
 	return &inode
+}
+
+func (inode Inode) GetTypeAndPermissionString() string {
+	t := UnpackTypeAndPermissions(inode.TypeAndPermissions)
+
+	result := []string{"-", "-", "-", "-", "-", "-", "-", "-", "-", "-"}
+	if !t.IsFile {
+		result[0] = "d"
+	}
+	if t.OwnerReadAccess {
+		result[1] = "r"
+	}
+	if t.OwnerWriteAccess {
+		result[2] = "w"
+	}
+	if t.OwnerExecuteAccess {
+		result[3] = "x"
+	}
+	if t.GroupReadAccess {
+		result[4] = "r"
+	}
+	if t.GroupWriteAccess {
+		result[5] = "w"
+	}
+	if t.GroupExecuteAccess {
+		result[6] = "x"
+	}
+	if t.UsersReadAccess {
+		result[7] = "r"
+	}
+	if t.UsersWriteAccess {
+		result[8] = "w"
+	}
+	if t.UsersExecuteAccess {
+		result[9] = "x"
+	}
+
+	return strings.Join(result, "")
 }
 
 func (inode Inode) WriteAt(file *os.File, offset uint32) error {

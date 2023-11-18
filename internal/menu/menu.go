@@ -117,7 +117,8 @@ func (m *Menu) executeCommand(command string, args []string) error {
 		fileName := args[0]
 		return m.fileSystem.DeleteFile(fileName, nil, nil)
 	case "list":
-		for _, name := range m.fileSystem.GetCurrentDirectoryRecords() {
+		long := len(args) > 0 && args[0] == "long"
+		for _, name := range m.fileSystem.GetCurrentDirectoryRecords(long) {
 			fmt.Println(name)
 		}
 		return nil

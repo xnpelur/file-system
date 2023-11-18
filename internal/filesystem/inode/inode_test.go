@@ -109,3 +109,76 @@ func TestNewTypeAndPermissions(t *testing.T) {
 		})
 	}
 }
+
+func Test(t *testing.T) {
+	testCases := []struct {
+		i        Inode
+		expected string
+	}{
+		// Add more test cases as needed
+		{
+			i: Inode{
+				TypeAndPermissions: PackTypeAndPermissions(
+					TypeAndPermissions{
+						IsFile:             false,
+						OwnerReadAccess:    true,
+						OwnerWriteAccess:   true,
+						OwnerExecuteAccess: true,
+						GroupReadAccess:    true,
+						GroupWriteAccess:   true,
+						GroupExecuteAccess: true,
+						UsersReadAccess:    true,
+						UsersWriteAccess:   true,
+						UsersExecuteAccess: true,
+					},
+				),
+			},
+			expected: "drwxrwxrwx",
+		},
+		{
+			i: Inode{
+				TypeAndPermissions: PackTypeAndPermissions(
+					TypeAndPermissions{
+						IsFile:             true,
+						OwnerReadAccess:    true,
+						OwnerWriteAccess:   false,
+						OwnerExecuteAccess: true,
+						GroupReadAccess:    false,
+						GroupWriteAccess:   true,
+						GroupExecuteAccess: false,
+						UsersReadAccess:    true,
+						UsersWriteAccess:   false,
+						UsersExecuteAccess: true,
+					},
+				),
+			},
+			expected: "-r-x-w-r-x",
+		},
+		{
+			i: Inode{
+				TypeAndPermissions: PackTypeAndPermissions(
+					TypeAndPermissions{
+						IsFile:             true,
+						OwnerReadAccess:    true,
+						OwnerWriteAccess:   true,
+						OwnerExecuteAccess: true,
+						GroupReadAccess:    true,
+						GroupWriteAccess:   true,
+						GroupExecuteAccess: true,
+						UsersReadAccess:    false,
+						UsersWriteAccess:   false,
+						UsersExecuteAccess: false,
+					},
+				),
+			},
+			expected: "-rwxrwx---",
+		},
+	}
+
+	for _, testCase := range testCases {
+		result := testCase.i.GetTypeAndPermissionString()
+		if result != testCase.expected {
+			t.Errorf("Expected: %s, Got: %s", testCase.expected, result)
+		}
+	}
+}
