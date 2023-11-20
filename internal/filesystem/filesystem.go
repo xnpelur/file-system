@@ -449,7 +449,16 @@ func (fs FileSystem) ReadFile(path string) (string, error) {
 	return str, nil
 }
 
-func (fs FileSystem) EditFile(name string, content string) error {
+func (fs FileSystem) EditFile(path string, content string) error {
+	currDir := fs.currentDirectory
+	currDirInode := fs.currentDirectoryInode
+	currPath := fs.currentPath
+
+	pathToFolder, name := utils.SplitPath(path)
+	if pathToFolder != "" {
+		fs.ChangeDirectory(pathToFolder)
+	}
+
 	inodeIndex, err := fs.currentDirectory.GetInode(name)
 	if err != nil {
 		return err
@@ -472,6 +481,10 @@ func (fs FileSystem) EditFile(name string, content string) error {
 	if err != nil {
 		return err
 	}
+
+	fs.currentDirectory = currDir
+	fs.currentDirectoryInode = currDirInode
+	fs.currentPath = currPath
 
 	return nil
 }
