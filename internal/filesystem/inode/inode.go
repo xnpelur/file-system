@@ -202,6 +202,11 @@ func (inode Inode) GetTypeAndPermissionString() string {
 	return strings.Join(result, "")
 }
 
+func (inode *Inode) ChangePermissions(value int) {
+	isFile := UnpackTypeAndPermissions(inode.TypeAndPermissions).IsFile
+	inode.TypeAndPermissions = PackTypeAndPermissions(NewTypeAndPermissions(isFile, value))
+}
+
 func (inode Inode) WriteAt(file *os.File, offset uint32) error {
 	data := inode.encode()
 

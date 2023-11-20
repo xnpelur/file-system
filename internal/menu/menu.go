@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -149,6 +150,16 @@ func (m *Menu) executeCommand(command string, args []string) error {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
 		return m.fileSystem.AddUser(args[0], args[1])
+	case "chmod":
+		if len(args) < 1 {
+			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
+		}
+		path := args[0]
+		permissions, err := strconv.Atoi(args[1])
+		if err != nil {
+			return err
+		}
+		return m.fileSystem.ChangePermissions(path, permissions)
 	default:
 		return fmt.Errorf("%w - %s", errs.ErrUnknownCommand, command)
 	}

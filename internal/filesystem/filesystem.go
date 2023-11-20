@@ -489,6 +489,40 @@ func (fs FileSystem) EditFile(path string, content string) error {
 	return nil
 }
 
+func (fs *FileSystem) ChangePermissions(path string, value int) error {
+	currDir := fs.currentDirectory
+	currDirInode := fs.currentDirectoryInode
+	currPath := fs.currentPath
+
+	pathToFolder, name := utils.SplitPath(path)
+	if pathToFolder != "" {
+		fs.ChangeDirectory(pathToFolder)
+	}
+
+	inodeIndex, err := fs.currentDirectory.GetInode(name)
+	if err != nil {
+		return err
+	}
+
+	inodeOffset := fs.GetInodeTableOffset() + inodeIndex*fs.Superblock.InodeSize
+	fileInode, err := inode.ReadInodeAt(fs.dataFile, inodeOffset)
+	if err != nil {
+		return err
+	}
+
+	fileInode.ChangePermissions(value)
+	err = fileInode.WriteAt(fs.dataFile, inodeOffset)
+	if err != nil {
+		return err
+	}
+
+	fs.currentDirectory = currDir
+	fs.currentDirectoryInode = currDirInode
+	fs.currentPath = currPath
+
+	return nil
+}
+
 func (fs FileSystem) GetCurrentPath() string {
 	return fs.currentPath
 }
