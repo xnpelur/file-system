@@ -102,19 +102,27 @@ func FormatFilesystem(sizeInBytes uint32, blockSize uint32) (*FileSystem, error)
 	inodeTableSize := fs.Superblock.InodeCount * fs.Superblock.InodeSize
 	fs.ReserveSpaceInFile(fs.GetInodeTableOffset(), inodeTableSize+sizeInBytes)
 
-	fs.InitializeFileSystem()
+	if err := fs.InitializeFileSystem(); err != nil {
+		return nil, err
+	}
 
 	return &fs, nil
 }
 
-func (fs *FileSystem) InitializeFileSystem() {
-	fs.CreateDirectory("/")
+func (fs *FileSystem) InitializeFileSystem() error {
+	if err := fs.CreateDirectory("/"); err != nil {
+		return err
+	}
 	fs.currentPath = "/"
 
-	fs.CreateDirectory(".users")
+	if err := fs.CreateDirectory(".users"); err != nil {
+		return err
+	}
 
-	fs.AddUser("root", "root")
-	fs.ChangeUser("root", "root")
+	if err := fs.AddUser("root", "root"); err != nil {
+		return err
+	}
+	return fs.ChangeUser("root", "root")
 }
 
 func (fs *FileSystem) AddUser(username, password string) error {
@@ -433,8 +441,10 @@ func (fs FileSystem) ReadFile(path string) (string, error) {
 		return "", err
 	}
 
-	if !inode.UnpackTypeAndPermissions(fileInode.TypeAndPermissions).IsFile {
-		return "", fmt.Errorf("%w - %s", errs.ErrRecordIsNotFile, name)
+	typeAndPermissions := inode.UnpackTypeAndPermissions(fileInode.TypeAndPermissions)
+
+	if fs.currentUser != nil && fs.currentUser.UserId != fileInode.UserId && !typeAndPermissions.UsersReadAccess {
+		return "", fmt.Errorf("%w - read %s", errs.ErrPermissionDenied, name)
 	}
 
 	blockOffset := fs.GetDataBlocksOffset() + fileInode.Blocks[0]*fs.Superblock.BlockSize
