@@ -48,6 +48,10 @@ func (m Menu) Start() {
 		input := scanner.Text()
 		parts := parseCommandLine(input)
 
+		if len(parts) == 0 {
+			continue
+		}
+
 		if parts[0] == "exit" {
 			fmt.Println("File system closed.")
 			return
