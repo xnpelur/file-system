@@ -169,6 +169,11 @@ func (fs *FileSystem) CreateFile(path string, content string) error {
 		fs.ChangeDirectory(pathToFolder)
 	}
 
+	typeAndPermissions := inode.UnpackTypeAndPermissions(fs.currentDirectoryInode.TypeAndPermissions)
+	if fs.currentUser.UserId != fs.currentDirectoryInode.UserId && !typeAndPermissions.UsersWriteAccess {
+		return fmt.Errorf("%w - %s", errs.ErrPermissionDenied, name)
+	}
+
 	if _, err := fs.currentDirectory.GetInode(name); err == nil {
 		return fmt.Errorf("%w - %s", errs.ErrRecordAlreadyExists, name)
 	}
@@ -207,6 +212,11 @@ func (fs *FileSystem) CreateDirectory(path string) error {
 	pathToFolder, name := utils.SplitPath(path)
 	if pathToFolder != "" {
 		fs.ChangeDirectory(pathToFolder)
+	}
+
+	typeAndPermissions := inode.UnpackTypeAndPermissions(fs.currentDirectoryInode.TypeAndPermissions)
+	if fs.currentUser.UserId != fs.currentDirectoryInode.UserId && !typeAndPermissions.UsersWriteAccess {
+		return fmt.Errorf("%w - %s", errs.ErrPermissionDenied, name)
 	}
 
 	if path != "/" {
@@ -490,7 +500,12 @@ func (fs FileSystem) EditFile(path string, content string) error {
 		return err
 	}
 
-	if !inode.UnpackTypeAndPermissions(fileInode.TypeAndPermissions).IsFile {
+	typeAndPermissions := inode.UnpackTypeAndPermissions(fileInode.TypeAndPermissions)
+	if fs.currentUser.UserId != fileInode.UserId && !typeAndPermissions.UsersWriteAccess {
+		return fmt.Errorf("%w - %s", errs.ErrPermissionDenied, name)
+	}
+
+	if !typeAndPermissions.IsFile {
 		return fmt.Errorf("%w - %s", errs.ErrRecordIsNotFile, name)
 	}
 
