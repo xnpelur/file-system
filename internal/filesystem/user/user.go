@@ -16,11 +16,11 @@ type User struct {
 	PasswordHash string
 }
 
-func NewUser(username, password string) *User {
+func NewUser(username string, userId uint16, groupId uint16, password string) *User {
 	return &User{
 		Username:     username,
-		UserId:       0,
-		GroupId:      0,
+		UserId:       userId,
+		GroupId:      groupId,
 		PasswordHash: hashPassword(password),
 	}
 }

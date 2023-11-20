@@ -31,6 +31,7 @@ type FileSystem struct {
 	currentDirectoryInode *inode.Inode
 	currentUser           *user.User
 	currentPath           string
+	nextUserId            uint16
 }
 
 func OpenFilesystem() (*FileSystem, error) {
@@ -117,7 +118,9 @@ func (fs *FileSystem) InitializeFileSystem() {
 }
 
 func (fs *FileSystem) AddUser(username, password string) error {
-	newUser := user.NewUser(username, password)
+	newUser := user.NewUser(username, fs.nextUserId, fs.nextUserId, password)
+	fs.nextUserId++
+
 	return fs.CreateFile(fmt.Sprintf("/.users/%s", username), newUser.GetUserString())
 }
 
@@ -132,6 +135,7 @@ func (fs *FileSystem) ChangeUser(username, password string) error {
 		return err
 	}
 
+	fs.ChangeDirectory("/")
 	fs.currentUser = u
 	return nil
 }
@@ -357,7 +361,13 @@ func (fs *FileSystem) ChangeDirectory(path string) error {
 			return err
 		}
 
-		if inode.UnpackTypeAndPermissions(dirInode.TypeAndPermissions).IsFile {
+		typeAndPermissions := inode.UnpackTypeAndPermissions(dirInode.TypeAndPermissions)
+
+		if fs.currentUser != nil && fs.currentUser.UserId != dirInode.UserId && !typeAndPermissions.UsersReadAccess {
+			return fmt.Errorf("%w - cd %s", errs.ErrPermissionDenied, dirName)
+		}
+
+		if typeAndPermissions.IsFile {
 			return fmt.Errorf("%w - %s", errs.ErrRecordIsNotDirectory, dirName)
 		}
 
@@ -508,6 +518,10 @@ func (fs *FileSystem) ChangePermissions(path string, value int) error {
 	fileInode, err := inode.ReadInodeAt(fs.dataFile, inodeOffset)
 	if err != nil {
 		return err
+	}
+
+	if fs.currentUser.UserId != fileInode.UserId {
+		return fmt.Errorf("%w - chmod %s", errs.ErrPermissionDenied, name)
 	}
 
 	fileInode.ChangePermissions(value)
