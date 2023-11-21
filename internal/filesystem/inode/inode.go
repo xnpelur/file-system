@@ -34,10 +34,6 @@ func NewInode(
 		blocks[i] = dataBlock
 	}
 
-	// if isHidden {
-	// 	typeAndPermissionsValue |= 0b01000000
-	// }
-
 	tap, err := getTapValue(isFile, numericPermissions)
 	if err != nil {
 		return nil, err
