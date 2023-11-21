@@ -119,17 +119,33 @@ func (fs *FileSystem) InitializeFileSystem() error {
 		return err
 	}
 
-	if err := fs.AddUser("root", "root"); err != nil {
+	if err := fs.AddUser("root", "root", false); err != nil {
 		return err
 	}
 	return fs.ChangeUser("root", "root")
 }
 
-func (fs *FileSystem) AddUser(username, password string) error {
-	newUser := user.NewUser(username, fs.nextUserId, fs.nextUserId, password)
+func (fs *FileSystem) AddUser(username, password string, withDirectory bool) error {
+	newUser := user.NewUser(username, fs.nextUserId, password)
 	fs.nextUserId++
 
-	return fs.CreateFile(fmt.Sprintf("/.users/%s", username), newUser.GetUserString())
+	if err := fs.CreateFile(fmt.Sprintf("/.users/%s", username), newUser.GetUserString()); err != nil {
+		return err
+	}
+
+	if withDirectory {
+		userDirPath := fmt.Sprintf("/%s", username)
+
+		if err := fs.CreateDirectory(userDirPath); err != nil {
+			return err
+		}
+
+		if err := fs.ChangeOwner(userDirPath, username); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (fs *FileSystem) ChangeUser(username, password string) error {
@@ -145,6 +161,54 @@ func (fs *FileSystem) ChangeUser(username, password string) error {
 
 	fs.ChangeDirectory("/")
 	fs.currentUser = u
+
+	if username != "root" {
+		userDirPath := fmt.Sprintf("/%s", username)
+		if err := fs.ChangeDirectory(userDirPath); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (fs *FileSystem) ChangeOwner(path string, username string) error {
+	currDir := fs.currentDirectory
+	currDirInode := fs.currentDirectoryInode
+	currPath := fs.currentPath
+
+	pathToFolder, fileName := utils.SplitPath(path)
+	if pathToFolder != "" {
+		fs.ChangeDirectory(pathToFolder)
+	}
+
+	inodeIndex, err := fs.currentDirectory.GetInode(fileName)
+	if err != nil {
+		return err
+	}
+
+	offset := fs.GetInodeTableOffset() + inodeIndex*fs.Superblock.InodeSize
+	fileInode, err := inode.ReadInodeAt(fs.dataFile, offset)
+	if err != nil {
+		return err
+	}
+
+	content, err := fs.ReadFile(fmt.Sprintf("/.users/%s", username))
+	if err != nil {
+		return err
+	}
+
+	fileInode.UserId, err = user.GetUserIdFromString(content)
+	if err != nil {
+		return err
+	}
+
+	fileInode.WriteAt(fs.dataFile, offset)
+
+	fs.currentDirectory = currDir
+	fs.currentDirectoryInode = currDirInode
+	fs.currentPath = currPath
+
 	return nil
 }
 

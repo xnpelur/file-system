@@ -153,7 +153,7 @@ func (m *Menu) executeCommand(command string, args []string) error {
 		if len(args) < 2 {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
-		return m.fileSystem.AddUser(args[0], args[1])
+		return m.fileSystem.AddUser(args[0], args[1], true)
 	case "chmod":
 		if len(args) < 1 {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)

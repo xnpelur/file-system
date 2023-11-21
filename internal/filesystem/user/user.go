@@ -12,15 +12,13 @@ import (
 type User struct {
 	Username     string
 	UserId       uint16
-	GroupId      uint16
 	PasswordHash string
 }
 
-func NewUser(username string, userId uint16, groupId uint16, password string) *User {
+func NewUser(username string, userId uint16, password string) *User {
 	return &User{
 		Username:     username,
 		UserId:       userId,
-		GroupId:      groupId,
 		PasswordHash: hashPassword(password),
 	}
 }
@@ -28,7 +26,7 @@ func NewUser(username string, userId uint16, groupId uint16, password string) *U
 func ReadUserFromString(str, password string) (*User, error) {
 	parts := strings.Fields(str)
 
-	if len(parts) < 4 {
+	if len(parts) < 3 {
 		return nil, fmt.Errorf("invalid input format")
 	}
 
@@ -37,16 +35,10 @@ func ReadUserFromString(str, password string) (*User, error) {
 		return nil, fmt.Errorf("error parsing UserId: %v", err)
 	}
 
-	groupId, err := strconv.ParseUint(parts[2], 10, 16)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing GroupId: %v", err)
-	}
-
 	u := &User{
 		Username:     parts[0],
 		UserId:       uint16(userId),
-		GroupId:      uint16(groupId),
-		PasswordHash: parts[3],
+		PasswordHash: parts[2],
 	}
 
 	if hashPassword(password) != u.PasswordHash {
@@ -56,8 +48,23 @@ func ReadUserFromString(str, password string) (*User, error) {
 	return u, nil
 }
 
+func GetUserIdFromString(str string) (uint16, error) {
+	parts := strings.Fields(str)
+
+	if len(parts) < 3 {
+		return 0, fmt.Errorf("invalid input format")
+	}
+
+	userId, err := strconv.ParseUint(parts[1], 10, 16)
+	if err != nil {
+		return 0, fmt.Errorf("error parsing UserId: %v", err)
+	}
+
+	return uint16(userId), nil
+}
+
 func (u User) GetUserString() string {
-	return fmt.Sprintf("%s %d %d %s", u.Username, u.UserId, u.GroupId, u.PasswordHash)
+	return fmt.Sprintf("%s %d %s", u.Username, u.UserId, u.PasswordHash)
 }
 
 func hashPassword(password string) string {
