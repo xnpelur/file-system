@@ -170,7 +170,8 @@ func (fs *FileSystem) CreateFile(path string, content string) error {
 	}
 
 	typeAndPermissions := inode.UnpackTypeAndPermissions(fs.currentDirectoryInode.TypeAndPermissions)
-	if fs.currentUser != nil && fs.currentUser.UserId != fs.currentDirectoryInode.UserId && !typeAndPermissions.UsersWriteAccess {
+
+	if fs.currentUser != nil && !(typeAndPermissions.UsersWriteAccess || fs.currentUser.UserId == fs.currentDirectoryInode.UserId && typeAndPermissions.OwnerWriteAccess) {
 		return fmt.Errorf("%w - %s", errs.ErrPermissionDenied, name)
 	}
 
@@ -220,7 +221,7 @@ func (fs *FileSystem) CreateDirectory(path string) error {
 		}
 
 		typeAndPermissions := inode.UnpackTypeAndPermissions(fs.currentDirectoryInode.TypeAndPermissions)
-		if fs.currentUser != nil && fs.currentUser.UserId != fs.currentDirectoryInode.UserId && !typeAndPermissions.UsersWriteAccess {
+		if fs.currentUser != nil && !(typeAndPermissions.UsersWriteAccess || fs.currentUser.UserId == fs.currentDirectoryInode.UserId && typeAndPermissions.OwnerWriteAccess) {
 			return fmt.Errorf("%w - %s", errs.ErrPermissionDenied, name)
 		}
 	}
@@ -277,7 +278,7 @@ func (fs *FileSystem) CreateFileOrDirectory(isFile bool) (uint32, uint32, error)
 	fs.BlockBitmap.WriteAt(fs.dataFile, fs.GetBlockBitmapOffset())
 	fs.InodeBitmap.WriteAt(fs.dataFile, fs.GetInodeBitmapOffset())
 
-	fileInode := inode.NewInode(isFile, 644, 0, 0, []uint32{blockIndex})
+	fileInode := inode.NewInode(isFile, 64, 0, 0, []uint32{blockIndex})
 	inodeOffset := fs.GetInodeTableOffset() + fs.Superblock.InodeSize*inodeIndex
 	fileInode.WriteAt(fs.dataFile, inodeOffset)
 
@@ -381,7 +382,7 @@ func (fs *FileSystem) ChangeDirectory(path string) error {
 
 		typeAndPermissions := inode.UnpackTypeAndPermissions(dirInode.TypeAndPermissions)
 
-		if fs.currentUser != nil && fs.currentUser.UserId != dirInode.UserId && !typeAndPermissions.UsersReadAccess {
+		if fs.currentUser != nil && !(typeAndPermissions.UsersReadAccess || fs.currentUser.UserId == dirInode.UserId && typeAndPermissions.OwnerReadAccess) {
 			return fmt.Errorf("%w - cd %s", errs.ErrPermissionDenied, dirName)
 		}
 
@@ -453,7 +454,7 @@ func (fs FileSystem) ReadFile(path string) (string, error) {
 
 	typeAndPermissions := inode.UnpackTypeAndPermissions(fileInode.TypeAndPermissions)
 
-	if fs.currentUser != nil && fs.currentUser.UserId != fileInode.UserId && !typeAndPermissions.UsersReadAccess {
+	if fs.currentUser != nil && !(typeAndPermissions.UsersReadAccess || fs.currentUser.UserId == fileInode.UserId && typeAndPermissions.OwnerReadAccess) {
 		return "", fmt.Errorf("%w - read %s", errs.ErrPermissionDenied, name)
 	}
 
@@ -501,7 +502,8 @@ func (fs FileSystem) EditFile(path string, content string) error {
 	}
 
 	typeAndPermissions := inode.UnpackTypeAndPermissions(fileInode.TypeAndPermissions)
-	if fs.currentUser.UserId != fileInode.UserId && !typeAndPermissions.UsersWriteAccess {
+
+	if !(typeAndPermissions.UsersWriteAccess || fs.currentUser.UserId == fileInode.UserId && typeAndPermissions.OwnerWriteAccess) {
 		return fmt.Errorf("%w - %s", errs.ErrPermissionDenied, name)
 	}
 

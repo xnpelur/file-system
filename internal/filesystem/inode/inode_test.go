@@ -7,19 +7,19 @@ import (
 
 func TestUnpackTypeAndPermissions(t *testing.T) {
 	tests := []struct {
-		input uint16
+		input uint8
 		want  TypeAndPermissions
 	}{
-		{0b1000000000000000, TypeAndPermissions{IsFile: true}},
-		{0b0111100000000000, TypeAndPermissions{OwnerReadAccess: true, OwnerWriteAccess: true, OwnerExecuteAccess: true, GroupReadAccess: true}},
-		{0b0000000001000000, TypeAndPermissions{UsersExecuteAccess: true}},
-		{0b0000000000000000, TypeAndPermissions{}},
+		{0b10000000, TypeAndPermissions{IsFile: true}},
+		{0b00111000, TypeAndPermissions{OwnerReadAccess: true, OwnerWriteAccess: true, OwnerExecuteAccess: true}},
+		{0b00000001, TypeAndPermissions{UsersExecuteAccess: true}},
+		{0b00000000, TypeAndPermissions{}},
 	}
 
 	for _, test := range tests {
 		got := UnpackTypeAndPermissions(test.input)
 		if got != test.want {
-			t.Errorf("UnpackTypeAndPermissions(%016b) = %v; want %v", test.input, got, test.want)
+			t.Errorf("UnpackTypeAndPermissions(%08b) = %v; want %v", test.input, got, test.want)
 		}
 	}
 }
@@ -27,18 +27,18 @@ func TestUnpackTypeAndPermissions(t *testing.T) {
 func TestPackTypeAndPermissions(t *testing.T) {
 	tests := []struct {
 		input TypeAndPermissions
-		want  uint16
+		want  uint8
 	}{
-		{TypeAndPermissions{IsFile: true}, 0b1000000000000000},
-		{TypeAndPermissions{OwnerReadAccess: true, OwnerWriteAccess: true, OwnerExecuteAccess: true, GroupReadAccess: true}, 0b0111100000000000},
-		{TypeAndPermissions{UsersExecuteAccess: true}, 0b0000000001000000},
-		{TypeAndPermissions{}, 0b0000000000000000},
+		{TypeAndPermissions{IsFile: true}, 0b10000000},
+		{TypeAndPermissions{OwnerReadAccess: true, OwnerWriteAccess: true, OwnerExecuteAccess: true}, 0b00111000},
+		{TypeAndPermissions{UsersExecuteAccess: true}, 0b00000001},
+		{TypeAndPermissions{}, 0b00000000},
 	}
 
 	for _, test := range tests {
 		got := PackTypeAndPermissions(test.input)
 		if got != test.want {
-			t.Errorf("PackTypeAndPermissions(%v) = %016b; want %016b", test.input, got, test.want)
+			t.Errorf("PackTypeAndPermissions(%v) = %08b; want %016b", test.input, got, test.want)
 		}
 	}
 }
@@ -46,7 +46,7 @@ func TestPackTypeAndPermissions(t *testing.T) {
 func TestConversionRoundTrip(t *testing.T) {
 	tests := []TypeAndPermissions{
 		{IsFile: true, OwnerReadAccess: true},
-		{OwnerWriteAccess: true, GroupReadAccess: true, UsersExecuteAccess: true},
+		{OwnerWriteAccess: true, UsersExecuteAccess: true},
 		{OwnerReadAccess: true, UsersReadAccess: true, UsersWriteAccess: true},
 		{IsFile: false},
 	}
@@ -67,15 +67,12 @@ func TestNewTypeAndPermissions(t *testing.T) {
 	}{
 		{
 			isFile:             true,
-			numericPermissions: 755,
+			numericPermissions: 75,
 			expectedPermissions: TypeAndPermissions{
 				IsFile:             true,
 				OwnerReadAccess:    true,
 				OwnerWriteAccess:   true,
 				OwnerExecuteAccess: true,
-				GroupReadAccess:    true,
-				GroupWriteAccess:   false,
-				GroupExecuteAccess: true,
 				UsersReadAccess:    true,
 				UsersWriteAccess:   false,
 				UsersExecuteAccess: true,
@@ -83,15 +80,12 @@ func TestNewTypeAndPermissions(t *testing.T) {
 		},
 		{
 			isFile:             false,
-			numericPermissions: 644,
+			numericPermissions: 64,
 			expectedPermissions: TypeAndPermissions{
 				IsFile:             false,
 				OwnerReadAccess:    true,
 				OwnerWriteAccess:   true,
 				OwnerExecuteAccess: false,
-				GroupReadAccess:    true,
-				GroupWriteAccess:   false,
-				GroupExecuteAccess: false,
 				UsersReadAccess:    true,
 				UsersWriteAccess:   false,
 				UsersExecuteAccess: false,
@@ -115,7 +109,6 @@ func Test(t *testing.T) {
 		i        Inode
 		expected string
 	}{
-		// Add more test cases as needed
 		{
 			i: Inode{
 				TypeAndPermissions: PackTypeAndPermissions(
@@ -124,16 +117,13 @@ func Test(t *testing.T) {
 						OwnerReadAccess:    true,
 						OwnerWriteAccess:   true,
 						OwnerExecuteAccess: true,
-						GroupReadAccess:    true,
-						GroupWriteAccess:   true,
-						GroupExecuteAccess: true,
 						UsersReadAccess:    true,
 						UsersWriteAccess:   true,
 						UsersExecuteAccess: true,
 					},
 				),
 			},
-			expected: "drwxrwxrwx",
+			expected: "drwxrwx",
 		},
 		{
 			i: Inode{
@@ -143,16 +133,13 @@ func Test(t *testing.T) {
 						OwnerReadAccess:    true,
 						OwnerWriteAccess:   false,
 						OwnerExecuteAccess: true,
-						GroupReadAccess:    false,
-						GroupWriteAccess:   true,
-						GroupExecuteAccess: false,
 						UsersReadAccess:    true,
 						UsersWriteAccess:   false,
 						UsersExecuteAccess: true,
 					},
 				),
 			},
-			expected: "-r-x-w-r-x",
+			expected: "-r-xr-x",
 		},
 		{
 			i: Inode{
@@ -162,16 +149,13 @@ func Test(t *testing.T) {
 						OwnerReadAccess:    true,
 						OwnerWriteAccess:   true,
 						OwnerExecuteAccess: true,
-						GroupReadAccess:    true,
-						GroupWriteAccess:   true,
-						GroupExecuteAccess: true,
 						UsersReadAccess:    false,
 						UsersWriteAccess:   false,
 						UsersExecuteAccess: false,
 					},
 				),
 			},
-			expected: "-rwxrwx---",
+			expected: "-rwx---",
 		},
 	}
 
