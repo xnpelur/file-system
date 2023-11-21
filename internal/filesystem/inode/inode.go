@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"strconv"
-	"strings"
 )
 
 type Inode struct {
@@ -18,17 +17,6 @@ type Inode struct {
 	CreationTime       uint32
 	ModificationTime   uint32
 	Blocks             [12]uint32
-}
-
-type TypeAndPermissions struct {
-	IsFile             bool
-	IsHidden           bool
-	OwnerReadAccess    bool
-	OwnerWriteAccess   bool
-	OwnerExecuteAccess bool
-	UsersReadAccess    bool
-	UsersWriteAccess   bool
-	UsersExecuteAccess bool
 }
 
 func NewInode(
@@ -79,69 +67,10 @@ func getTapValue(isFile bool, numericPermissions int) (uint8, error) {
 	return value, nil
 }
 
-func NewTypeAndPermissions(isFile bool, numericPermissions int) TypeAndPermissions {
-	users := numericPermissions % 10
-	owner := numericPermissions / 10 % 10
-
-	return TypeAndPermissions{
-		IsFile:             isFile,
-		IsHidden:           false,
-		OwnerReadAccess:    (owner>>2)&1 == 1,
-		OwnerWriteAccess:   (owner>>1)&1 == 1,
-		OwnerExecuteAccess: (owner>>0)&1 == 1,
-		UsersReadAccess:    (users>>2)&1 == 1,
-		UsersWriteAccess:   (users>>1)&1 == 1,
-		UsersExecuteAccess: (users>>0)&1 == 1,
-	}
-}
-
 func GetInodeSize() uint32 {
 	inodeDummy := Inode{}
 	size, _ := utils.CalculateStructSize(inodeDummy)
 	return size
-}
-
-func UnpackTypeAndPermissions(value uint8) TypeAndPermissions {
-	return TypeAndPermissions{
-		IsFile:             value&0b10000000 != 0,
-		IsHidden:           value&0b01000000 != 0,
-		OwnerReadAccess:    value&0b00100000 != 0,
-		OwnerWriteAccess:   value&0b00010000 != 0,
-		OwnerExecuteAccess: value&0b00001000 != 0,
-		UsersReadAccess:    value&0b00000100 != 0,
-		UsersWriteAccess:   value&0b00000010 != 0,
-		UsersExecuteAccess: value&0b00000001 != 0,
-	}
-}
-
-func PackTypeAndPermissions(typeAndPermissions TypeAndPermissions) uint8 {
-	var value uint8
-	if typeAndPermissions.IsFile {
-		value |= 0b10000000
-	}
-	if typeAndPermissions.IsHidden {
-		value |= 0b01000000
-	}
-	if typeAndPermissions.OwnerReadAccess {
-		value |= 0b00100000
-	}
-	if typeAndPermissions.OwnerWriteAccess {
-		value |= 0b00010000
-	}
-	if typeAndPermissions.OwnerExecuteAccess {
-		value |= 0b00001000
-	}
-	if typeAndPermissions.UsersReadAccess {
-		value |= 0b00000100
-	}
-	if typeAndPermissions.UsersWriteAccess {
-		value |= 0b00000010
-	}
-	if typeAndPermissions.UsersExecuteAccess {
-		value |= 0b00000001
-	}
-
-	return value
 }
 
 func ReadInodeAt(file *os.File, offset uint32) (*Inode, error) {
@@ -178,37 +107,24 @@ func decodeInode(data []byte) *Inode {
 }
 
 func (inode Inode) GetTypeAndPermissionString() string {
-	t := UnpackTypeAndPermissions(inode.TypeAndPermissions)
+	permissions := "rwx"
 
-	result := []string{"-", "-", "-", "-", "-", "-", "-"}
-	if !t.IsFile {
-		result[0] = "d"
-	}
-	if t.OwnerReadAccess {
-		result[1] = "r"
-	}
-	if t.OwnerWriteAccess {
-		result[2] = "w"
-	}
-	if t.OwnerExecuteAccess {
-		result[3] = "x"
-	}
-	if t.UsersReadAccess {
-		result[4] = "r"
-	}
-	if t.UsersWriteAccess {
-		result[5] = "w"
-	}
-	if t.UsersExecuteAccess {
-		result[6] = "x"
+	result := []byte("-------")
+	if !inode.IsFile() {
+		result[0] = 'd'
 	}
 
-	return strings.Join(result, "")
+	for i := 0; i < 6; i++ {
+		if int(inode.TypeAndPermissions)>>(5-i)&1 == 1 {
+			result[i+1] = permissions[i%3]
+		}
+	}
+
+	return string(result)
 }
 
 func (inode *Inode) ChangePermissions(value int) error {
-	isFile := UnpackTypeAndPermissions(inode.TypeAndPermissions).IsFile
-	tap, err := getTapValue(isFile, value)
+	tap, err := getTapValue(inode.IsFile(), value)
 	if err != nil {
 		return err
 	}
@@ -217,17 +133,21 @@ func (inode *Inode) ChangePermissions(value int) error {
 }
 
 func (inode Inode) HasReadPermission(user user.User) bool {
-	tap := UnpackTypeAndPermissions(inode.TypeAndPermissions)
-	return tap.UsersReadAccess || user.UserId == inode.UserId && tap.OwnerReadAccess
+	ownerReadAccess := inode.TypeAndPermissions&0b00100000 != 0
+	usersReadAccess := inode.TypeAndPermissions&0b00000100 != 0
+
+	return usersReadAccess || user.UserId == inode.UserId && ownerReadAccess
 }
 
 func (inode Inode) HasWritePermission(user user.User) bool {
-	tap := UnpackTypeAndPermissions(inode.TypeAndPermissions)
-	return tap.UsersWriteAccess || user.UserId == inode.UserId && tap.OwnerWriteAccess
+	ownerWriteAccess := inode.TypeAndPermissions&0b00010000 != 0
+	usersWriteAccess := inode.TypeAndPermissions&0b00000010 != 0
+
+	return usersWriteAccess || user.UserId == inode.UserId && ownerWriteAccess
 }
 
 func (inode Inode) IsFile() bool {
-	return UnpackTypeAndPermissions(inode.TypeAndPermissions).IsFile
+	return inode.TypeAndPermissions&0b10000000 != 0
 }
 
 func (inode Inode) WriteAt(file *os.File, offset uint32) error {
