@@ -233,9 +233,7 @@ func (fs *FileSystem) CreateFile(path string, content string) error {
 		fs.ChangeDirectory(pathToFolder)
 	}
 
-	typeAndPermissions := inode.UnpackTypeAndPermissions(fs.currentDirectoryInode.TypeAndPermissions)
-
-	if fs.currentUser != nil && !(typeAndPermissions.UsersWriteAccess || fs.currentUser.UserId == fs.currentDirectoryInode.UserId && typeAndPermissions.OwnerWriteAccess) {
+	if fs.currentUser != nil && !fs.currentDirectoryInode.HasWritePermission(*fs.currentUser) {
 		return fmt.Errorf("%w - %s", errs.ErrPermissionDenied, name)
 	}
 
@@ -284,8 +282,7 @@ func (fs *FileSystem) CreateDirectory(path string) error {
 			return fmt.Errorf("%w - %s", errs.ErrRecordAlreadyExists, name)
 		}
 
-		typeAndPermissions := inode.UnpackTypeAndPermissions(fs.currentDirectoryInode.TypeAndPermissions)
-		if fs.currentUser != nil && !(typeAndPermissions.UsersWriteAccess || fs.currentUser.UserId == fs.currentDirectoryInode.UserId && typeAndPermissions.OwnerWriteAccess) {
+		if fs.currentUser != nil && !fs.currentDirectoryInode.HasWritePermission(*fs.currentUser) {
 			return fmt.Errorf("%w - %s", errs.ErrPermissionDenied, name)
 		}
 	}
@@ -342,7 +339,11 @@ func (fs *FileSystem) CreateFileOrDirectory(isFile bool) (uint32, uint32, error)
 	fs.BlockBitmap.WriteAt(fs.dataFile, fs.GetBlockBitmapOffset())
 	fs.InodeBitmap.WriteAt(fs.dataFile, fs.GetInodeBitmapOffset())
 
-	fileInode := inode.NewInode(isFile, 64, 0, 0, []uint32{blockIndex})
+	fileInode, err := inode.NewInode(isFile, 64, 0, 0, []uint32{blockIndex})
+	if err != nil {
+		return 0, 0, err
+	}
+
 	inodeOffset := fs.GetInodeTableOffset() + fs.Superblock.InodeSize*inodeIndex
 	fileInode.WriteAt(fs.dataFile, inodeOffset)
 
@@ -370,7 +371,7 @@ func (fs *FileSystem) DeleteFile(name string, fromDirectory *directory.Directory
 		return err
 	}
 
-	if !inode.UnpackTypeAndPermissions(fileInode.TypeAndPermissions).IsFile {
+	if !fileInode.IsFile() {
 		dirOffset := fs.GetDataBlocksOffset() + fileInode.Blocks[0]*fs.Superblock.BlockSize
 		dir, err := directory.ReadDirectoryAt(fs.dataFile, dirOffset)
 		if err != nil {
@@ -444,13 +445,11 @@ func (fs *FileSystem) ChangeDirectory(path string) error {
 			return err
 		}
 
-		typeAndPermissions := inode.UnpackTypeAndPermissions(dirInode.TypeAndPermissions)
-
-		if fs.currentUser != nil && !(typeAndPermissions.UsersReadAccess || fs.currentUser.UserId == dirInode.UserId && typeAndPermissions.OwnerReadAccess) {
+		if fs.currentUser != nil && !dirInode.HasReadPermission(*fs.currentUser) {
 			return fmt.Errorf("%w - cd %s", errs.ErrPermissionDenied, dirName)
 		}
 
-		if typeAndPermissions.IsFile {
+		if dirInode.IsFile() {
 			return fmt.Errorf("%w - %s", errs.ErrRecordIsNotDirectory, dirName)
 		}
 
@@ -516,9 +515,7 @@ func (fs FileSystem) ReadFile(path string) (string, error) {
 		return "", err
 	}
 
-	typeAndPermissions := inode.UnpackTypeAndPermissions(fileInode.TypeAndPermissions)
-
-	if fs.currentUser != nil && !(typeAndPermissions.UsersReadAccess || fs.currentUser.UserId == fileInode.UserId && typeAndPermissions.OwnerReadAccess) {
+	if fs.currentUser != nil && !fileInode.HasReadPermission(*fs.currentUser) {
 		return "", fmt.Errorf("%w - read %s", errs.ErrPermissionDenied, name)
 	}
 
@@ -565,13 +562,11 @@ func (fs FileSystem) EditFile(path string, content string) error {
 		return err
 	}
 
-	typeAndPermissions := inode.UnpackTypeAndPermissions(fileInode.TypeAndPermissions)
-
-	if !(typeAndPermissions.UsersWriteAccess || fs.currentUser.UserId == fileInode.UserId && typeAndPermissions.OwnerWriteAccess) {
+	if !fileInode.HasWritePermission(*fs.currentUser) {
 		return fmt.Errorf("%w - %s", errs.ErrPermissionDenied, name)
 	}
 
-	if !typeAndPermissions.IsFile {
+	if !fileInode.IsFile() {
 		return fmt.Errorf("%w - %s", errs.ErrRecordIsNotFile, name)
 	}
 
@@ -615,7 +610,11 @@ func (fs *FileSystem) ChangePermissions(path string, value int) error {
 		return fmt.Errorf("%w - chmod %s", errs.ErrPermissionDenied, name)
 	}
 
-	fileInode.ChangePermissions(value)
+	err = fileInode.ChangePermissions(value)
+	if err != nil {
+		return err
+	}
+
 	err = fileInode.WriteAt(fs.dataFile, inodeOffset)
 	if err != nil {
 		return err

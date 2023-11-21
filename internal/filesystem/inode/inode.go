@@ -2,9 +2,11 @@ package inode
 
 import (
 	"encoding/binary"
+	"file-system/internal/filesystem/user"
 	"file-system/internal/utils"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -35,7 +37,7 @@ func NewInode(
 	userId int,
 	groupId int,
 	dataBlocks []uint32,
-) *Inode {
+) (*Inode, error) {
 	var blocks [12]uint32
 	for i, dataBlock := range dataBlocks {
 		if i >= 12 {
@@ -43,13 +45,38 @@ func NewInode(
 		}
 		blocks[i] = dataBlock
 	}
+
+	// if isHidden {
+	// 	typeAndPermissionsValue |= 0b01000000
+	// }
+
+	tap, err := getTapValue(isFile, numericPermissions)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Inode{
-		TypeAndPermissions: PackTypeAndPermissions(NewTypeAndPermissions(isFile, numericPermissions)),
+		TypeAndPermissions: tap,
 		UserId:             uint16(userId),
 		GroupId:            uint16(groupId),
 		FileSize:           uint32(len(dataBlocks)),
 		Blocks:             blocks,
+	}, nil
+}
+
+func getTapValue(isFile bool, numericPermissions int) (uint8, error) {
+	strNumber := strconv.FormatInt(int64(numericPermissions), 10)
+	decimalNumber, err := strconv.ParseUint(strNumber, 8, 8)
+	if err != nil {
+		return 0, err
 	}
+
+	value := uint8(decimalNumber)
+	if isFile {
+		value |= 0b10000000
+	}
+
+	return value, nil
 }
 
 func NewTypeAndPermissions(isFile bool, numericPermissions int) TypeAndPermissions {
@@ -179,9 +206,28 @@ func (inode Inode) GetTypeAndPermissionString() string {
 	return strings.Join(result, "")
 }
 
-func (inode *Inode) ChangePermissions(value int) {
+func (inode *Inode) ChangePermissions(value int) error {
 	isFile := UnpackTypeAndPermissions(inode.TypeAndPermissions).IsFile
-	inode.TypeAndPermissions = PackTypeAndPermissions(NewTypeAndPermissions(isFile, value))
+	tap, err := getTapValue(isFile, value)
+	if err != nil {
+		return err
+	}
+	inode.TypeAndPermissions = tap
+	return nil
+}
+
+func (inode Inode) HasReadPermission(user user.User) bool {
+	tap := UnpackTypeAndPermissions(inode.TypeAndPermissions)
+	return tap.UsersReadAccess || user.UserId == inode.UserId && tap.OwnerReadAccess
+}
+
+func (inode Inode) HasWritePermission(user user.User) bool {
+	tap := UnpackTypeAndPermissions(inode.TypeAndPermissions)
+	return tap.UsersWriteAccess || user.UserId == inode.UserId && tap.OwnerWriteAccess
+}
+
+func (inode Inode) IsFile() bool {
+	return UnpackTypeAndPermissions(inode.TypeAndPermissions).IsFile
 }
 
 func (inode Inode) WriteAt(file *os.File, offset uint32) error {
