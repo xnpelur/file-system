@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"time"
 )
 
 type Inode struct {
@@ -41,6 +42,8 @@ func NewInode(
 		TypeAndPermissions: tap,
 		UserId:             uint16(userId),
 		FileSize:           uint32(len(dataBlocks)),
+		CreationTime:       uint32(time.Now().Unix()),
+		ModificationTime:   uint32(time.Now().Unix()),
 		Blocks:             blocks,
 	}, nil
 }

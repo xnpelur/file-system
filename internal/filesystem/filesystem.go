@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 )
 
 type Config struct {
@@ -465,7 +466,10 @@ func (fs FileSystem) GetCurrentDirectoryRecords(long bool) []string {
 		offset := fs.GetInodeTableOffset() + recordInodeIndex*fs.Superblock.InodeSize
 		recordInode, _ := inode.ReadInodeAt(fs.dataFile, offset)
 		tapString := recordInode.GetTypeAndPermissionString()
-		result[i] = fmt.Sprintf("%s %d %s", tapString, recordInode.UserId, name)
+		fileSizeInBytes := recordInode.FileSize * fs.Superblock.BlockSize
+		modificationTime := time.Unix(int64(recordInode.ModificationTime), 0)
+		modificationTimeString := modificationTime.Format("Jan 2 15:04")
+		result[i] = fmt.Sprintf("%s %d %d %s %s", tapString, recordInode.UserId, fileSizeInBytes, modificationTimeString, name)
 	}
 
 	return result
@@ -551,6 +555,12 @@ func (fs FileSystem) EditFile(path string, content string) error {
 	data := utils.StringToByteBlock(content, fs.Superblock.BlockSize)
 
 	_, err = fs.dataFile.WriteAt(data, int64(blockOffset))
+	if err != nil {
+		return err
+	}
+
+	fileInode.ModificationTime = uint32(time.Now().Unix())
+	err = fileInode.WriteAt(fs.dataFile, inodeOffset)
 	if err != nil {
 		return err
 	}
