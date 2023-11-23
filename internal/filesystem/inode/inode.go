@@ -12,7 +12,6 @@ import (
 type Inode struct {
 	TypeAndPermissions uint8
 	UserId             uint16
-	GroupId            uint16
 	FileSize           uint32
 	CreationTime       uint32
 	ModificationTime   uint32
@@ -22,8 +21,7 @@ type Inode struct {
 func NewInode(
 	isFile bool,
 	numericPermissions int,
-	userId int,
-	groupId int,
+	userId uint16,
 	dataBlocks []uint32,
 ) (*Inode, error) {
 	var blocks [12]uint32
@@ -42,7 +40,6 @@ func NewInode(
 	return &Inode{
 		TypeAndPermissions: tap,
 		UserId:             uint16(userId),
-		GroupId:            uint16(groupId),
 		FileSize:           uint32(len(dataBlocks)),
 		Blocks:             blocks,
 	}, nil
@@ -89,13 +86,12 @@ func decodeInode(data []byte) *Inode {
 
 	inode.TypeAndPermissions = data[0]
 	inode.UserId = binary.BigEndian.Uint16(data[1:3])
-	inode.GroupId = binary.BigEndian.Uint16(data[3:5])
-	inode.FileSize = binary.BigEndian.Uint32(data[5:9])
-	inode.CreationTime = binary.BigEndian.Uint32(data[9:13])
-	inode.ModificationTime = binary.BigEndian.Uint32(data[13:17])
+	inode.FileSize = binary.BigEndian.Uint32(data[3:7])
+	inode.CreationTime = binary.BigEndian.Uint32(data[7:11])
+	inode.ModificationTime = binary.BigEndian.Uint32(data[11:15])
 
 	for i := 0; i < 12; i++ {
-		offset := 17 + i*4
+		offset := 15 + i*4
 		inode.Blocks[i] = binary.BigEndian.Uint32(data[offset : offset+4])
 	}
 
@@ -162,13 +158,12 @@ func (value Inode) encode() []byte {
 
 	data[0] = value.TypeAndPermissions
 	binary.BigEndian.PutUint16(data[1:3], value.UserId)
-	binary.BigEndian.PutUint16(data[3:5], value.GroupId)
-	binary.BigEndian.PutUint32(data[5:9], value.FileSize)
-	binary.BigEndian.PutUint32(data[9:13], value.CreationTime)
-	binary.BigEndian.PutUint32(data[13:17], value.ModificationTime)
+	binary.BigEndian.PutUint32(data[3:7], value.FileSize)
+	binary.BigEndian.PutUint32(data[7:11], value.CreationTime)
+	binary.BigEndian.PutUint32(data[11:15], value.ModificationTime)
 
 	for i := 0; i < 12; i++ {
-		offset := 17 + i*4
+		offset := 15 + i*4
 		binary.BigEndian.PutUint32(data[offset:offset+4], value.Blocks[i])
 	}
 

@@ -271,7 +271,12 @@ func (fs *FileSystem) CreateEntity(path string, isFile bool, content string) err
 	fs.BlockBitmap.WriteAt(fs.dataFile, fs.GetBlockBitmapOffset())
 	fs.InodeBitmap.WriteAt(fs.dataFile, fs.GetInodeBitmapOffset())
 
-	fileInode, err := inode.NewInode(isFile, 64, 0, 0, []uint32{blockIndex})
+	var userId uint16
+	if fs.currentUser != nil {
+		userId = fs.currentUser.UserId
+	}
+
+	fileInode, err := inode.NewInode(isFile, 64, userId, []uint32{blockIndex})
 	if err != nil {
 		return err
 	}
@@ -460,7 +465,7 @@ func (fs FileSystem) GetCurrentDirectoryRecords(long bool) []string {
 		offset := fs.GetInodeTableOffset() + recordInodeIndex*fs.Superblock.InodeSize
 		recordInode, _ := inode.ReadInodeAt(fs.dataFile, offset)
 		tapString := recordInode.GetTypeAndPermissionString()
-		result[i] = fmt.Sprintf("%s %d %d %s", tapString, recordInode.UserId, recordInode.GroupId, name)
+		result[i] = fmt.Sprintf("%s %d %s", tapString, recordInode.UserId, name)
 	}
 
 	return result
