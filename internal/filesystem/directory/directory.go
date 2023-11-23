@@ -14,7 +14,7 @@ type Directory struct {
 	keys    []string
 }
 
-func CreateNewDirectory(inode uint32, parentInode uint32) *Directory {
+func NewDirectory(inode uint32, parentInode uint32) *Directory {
 	currDir := record.NewRecord(inode, ".")
 	parentDir := record.NewRecord(parentInode, "..")
 

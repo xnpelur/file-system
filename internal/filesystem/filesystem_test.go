@@ -20,7 +20,7 @@ func TestFilesystemIntegration(t *testing.T) {
 	const updatedFileContent = "Updated file content"
 
 	t.Run("TestCreateFile", func(t *testing.T) {
-		err := fs.CreateFile("test.txt", fileContent)
+		err := fs.CreateFileWithContent("test.txt", fileContent)
 		if err != nil {
 			t.Errorf("CreateFile error: %v", err)
 		}
@@ -88,7 +88,7 @@ func TestDeleteDirectoryWithNestedFiles(t *testing.T) {
 		if err = fs.ChangeDirectory(dirName); err != nil {
 			t.Fatalf("Failed to change directory to %s: %v", dirName, err)
 		}
-		if err = fs.CreateFile(fileName, ""); err != nil {
+		if err = fs.CreateEmptyFile(fileName); err != nil {
 			t.Fatalf("Failed to create file %s: %v", fileName, err)
 		}
 	}
@@ -117,7 +117,7 @@ func TestDataFileSimpleIdempotency(t *testing.T) {
 		t.Fatalf("Failed to read data file: %v", err)
 	}
 
-	if err = fs.CreateFile("file", "file content"); err != nil {
+	if err = fs.CreateFileWithContent("file", "file content"); err != nil {
 		t.Fatalf("Failed to create file: %v", err)
 	}
 
@@ -151,13 +151,13 @@ func TestDataFileComplexIdempotency(t *testing.T) {
 	if err = fs.CreateDirectory("dir"); err != nil {
 		t.Fatalf("Failed to create directory: %v", err)
 	}
-	if err = fs.CreateFile("file", "file content"); err != nil {
+	if err = fs.CreateFileWithContent("file", "file content"); err != nil {
 		t.Fatalf("Failed to create file: %v", err)
 	}
 	if err = fs.ChangeDirectory("dir"); err != nil {
 		t.Fatalf("Failed to change current directory: %v", err)
 	}
-	if err = fs.CreateFile("otherfile", "other file content"); err != nil {
+	if err = fs.CreateFileWithContent("otherfile", "other file content"); err != nil {
 		t.Fatalf("Failed to create file: %v", err)
 	}
 	if err = fs.CreateDirectory("otherdir"); err != nil {

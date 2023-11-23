@@ -89,11 +89,11 @@ func (m *Menu) executeCommand(command string, args []string) error {
 			return m.fileSystem.CreateDirectory(fileName[:len(fileName)-1])
 		}
 
-		fileContent := ""
 		if len(args) > 1 {
-			fileContent = args[1]
+			fileContent := args[1]
+			return m.fileSystem.CreateFileWithContent(fileName, fileContent)
 		}
-		return m.fileSystem.CreateFile(fileName, fileContent)
+		return m.fileSystem.CreateEmptyFile(fileName)
 	case "edit":
 		if len(args) < 1 {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
