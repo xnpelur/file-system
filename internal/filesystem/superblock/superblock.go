@@ -3,8 +3,8 @@ package superblock
 import (
 	"encoding/binary"
 	"file-system/internal/filesystem/inode"
-	"file-system/internal/utils"
 	"os"
+	"unsafe"
 )
 
 type Superblock struct {
@@ -15,9 +15,22 @@ type Superblock struct {
 	FreeInodeCount uint32
 	BlockSize      uint32
 	InodeSize      uint32
+	file           *os.File
 }
 
-func NewSuperblock(filesystemSizeInBytes, blockSize uint32) *Superblock {
+func (s Superblock) Size() uint32 {
+	return uint32(
+		unsafe.Sizeof(s.MagicNumber) +
+			unsafe.Sizeof(s.BlockCount) +
+			unsafe.Sizeof(s.InodeCount) +
+			unsafe.Sizeof(s.FreeBlockCount) +
+			unsafe.Sizeof(s.FreeInodeCount) +
+			unsafe.Sizeof(s.BlockSize) +
+			unsafe.Sizeof(s.InodeSize),
+	)
+}
+
+func NewSuperblock(filesystemSizeInBytes, blockSize uint32, file *os.File) *Superblock {
 	s := Superblock{}
 
 	blockCount := filesystemSizeInBytes / blockSize
@@ -29,13 +42,9 @@ func NewSuperblock(filesystemSizeInBytes, blockSize uint32) *Superblock {
 	s.FreeInodeCount = blockCount
 	s.BlockSize = blockSize
 	s.InodeSize = inode.GetInodeSize()
+	s.file = file
 
 	return &s
-}
-
-func (s Superblock) Size() uint32 {
-	size, _ := utils.CalculateStructSize(s)
-	return size
 }
 
 func ReadSuperblockAt(file *os.File, offset uint32) (*Superblock, error) {
@@ -46,7 +55,10 @@ func ReadSuperblockAt(file *os.File, offset uint32) (*Superblock, error) {
 		return nil, err
 	}
 
-	return decodeSuperblock(data), nil
+	s := decodeSuperblock(data)
+	s.file = file
+
+	return s, nil
 }
 
 func decodeSuperblock(data []byte) *Superblock {
@@ -63,7 +75,11 @@ func decodeSuperblock(data []byte) *Superblock {
 	return &s
 }
 
-func (s Superblock) WriteAt(file *os.File, offset uint32) error {
+func (s Superblock) Save() error {
+	return s.writeAt(s.file, 0)
+}
+
+func (s Superblock) writeAt(file *os.File, offset uint32) error {
 	data := encodeSuperblock(s)
 
 	_, err := file.WriteAt(data, int64(offset))
@@ -75,7 +91,7 @@ func (s Superblock) WriteAt(file *os.File, offset uint32) error {
 }
 
 func encodeSuperblock(value Superblock) []byte {
-	size, _ := utils.CalculateStructSize(value)
+	size := value.Size()
 	data := make([]byte, size)
 
 	binary.BigEndian.PutUint16(data[0:2], value.MagicNumber)

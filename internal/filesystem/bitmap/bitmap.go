@@ -6,17 +6,23 @@ import (
 )
 
 type Bitmap struct {
-	Data []uint8
-	Size uint32
+	Data   []uint8
+	size   uint32
+	file   *os.File
+	offset uint32
 }
 
-func NewBitmap(size uint32) *Bitmap {
+func NewBitmap(size uint32, file *os.File, offset uint32) *Bitmap {
 	data := make([]uint8, (size+7)/8)
-	return &Bitmap{data, size}
+	return &Bitmap{data, size, file, offset}
+}
+
+func (b Bitmap) Size() uint32 {
+	return b.size / 8
 }
 
 func (b *Bitmap) SetBit(index uint32, value int) error {
-	if index >= b.Size {
+	if index >= b.size {
 		return errors.New("index out of bounds")
 	}
 	if value != 0 && value != 1 {
@@ -34,7 +40,7 @@ func (b *Bitmap) SetBit(index uint32, value int) error {
 }
 
 func (b *Bitmap) GetBit(index uint32) (int, error) {
-	if index >= b.Size {
+	if index >= b.size {
 		return 0, errors.New("index out of bounds")
 	}
 	byteIndex, bitOffset := index/8, 7-index%8
@@ -43,7 +49,7 @@ func (b *Bitmap) GetBit(index uint32) (int, error) {
 }
 
 func (b *Bitmap) TakeFreeBit() (uint32, error) {
-	for i := uint32(0); i < b.Size; i++ {
+	for i := uint32(0); i < b.size; i++ {
 		bit, err := b.GetBit(i)
 		if err != nil {
 			return 0, err
@@ -67,13 +73,14 @@ func ReadBitmapAt(file *os.File, offset uint32, size uint32) (*Bitmap, error) {
 		return nil, err
 	}
 
-	return &Bitmap{
-		Data: data,
-		Size: size,
-	}, nil
+	return &Bitmap{data, size, file, offset}, nil
 }
 
-func (b Bitmap) WriteAt(file *os.File, offset uint32) error {
+func (b Bitmap) Save() error {
+	return b.writeAt(b.file, b.offset)
+}
+
+func (b Bitmap) writeAt(file *os.File, offset uint32) error {
 	_, err := file.WriteAt(b.Data, int64(offset))
 	if err != nil {
 		return err
