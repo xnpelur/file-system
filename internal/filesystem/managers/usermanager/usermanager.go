@@ -9,11 +9,14 @@ type UserManager struct {
 }
 
 func NewUserManager() *UserManager {
-	return &UserManager{}
+	return &UserManager{
+		users: make(map[uint16]string),
+	}
 }
 
 func (um *UserManager) CreateNewUser(username, password string) *user.User {
 	newUser := user.NewUser(username, um.nextId, password)
+	um.users[um.nextId] = username
 	um.nextId++
 	return newUser
 }
@@ -25,4 +28,8 @@ func (um *UserManager) LoadUsers(users map[uint16]string) {
 			um.nextId = key + 1
 		}
 	}
+}
+
+func (um *UserManager) GetUsername(userId uint16) string {
+	return um.users[userId]
 }

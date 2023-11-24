@@ -498,11 +498,14 @@ func (fs FileSystem) GetCurrentDirectoryRecords(long bool) []string {
 	for i, name := range recordNames {
 		recordInodeIndex, _ := fs.directoryManager.Current.GetInode(name)
 		recordInode, _ := fs.inodeManager.ReadInode(recordInodeIndex)
+
 		tapString := recordInode.GetTypeAndPermissionString()
+		ownerUsername := fs.userManager.GetUsername(recordInode.UserId)
 		fileSizeInBytes := recordInode.FileSize * fs.superblock.BlockSize
 		modificationTime := time.Unix(int64(recordInode.ModificationTime), 0)
 		modificationTimeString := modificationTime.Format("Jan 2 15:04")
-		result[i] = fmt.Sprintf("%s %d %d %s %s", tapString, recordInode.UserId, fileSizeInBytes, modificationTimeString, name)
+
+		result[i] = fmt.Sprintf("%s\t%s\t%d\t%s\t%s", tapString, ownerUsername, fileSizeInBytes, modificationTimeString, name)
 	}
 
 	return result
