@@ -120,7 +120,7 @@ func (m *Menu) executeCommand(command string, args []string) error {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
 		fileName := args[0]
-		return m.fileSystem.DeleteFile(fileName, nil, nil)
+		return m.fileSystem.DeleteFile(fileName)
 	case "list":
 		long := len(args) > 0 && args[0] == "-l"
 		for _, name := range m.fileSystem.GetCurrentDirectoryRecords(long) {

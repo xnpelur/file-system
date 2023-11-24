@@ -59,7 +59,7 @@ func TestFilesystemIntegration(t *testing.T) {
 	})
 
 	t.Run("TestDeleteFile", func(t *testing.T) {
-		err := fs.DeleteFile("test.txt", fs.directoryManager.Current, fs.currentDirectoryInode)
+		err := fs.DeleteFile("test.txt")
 		if err != nil {
 			t.Errorf("DeleteFile error: %v", err)
 		}
@@ -103,7 +103,7 @@ func TestDeleteDirectoryWithNestedFiles(t *testing.T) {
 		t.Fatalf("Failed to go back to root - cd %s: %v", pathToRoot, err)
 	}
 
-	if err = fs.DeleteFile("dir1", fs.directoryManager.Current, fs.currentDirectoryInode); err != nil {
+	if err = fs.DeleteFile("dir1"); err != nil {
 		t.Fatalf("Failed to delete dir1: %v", err)
 	}
 }
@@ -121,7 +121,7 @@ func TestDataFileSimpleIdempotency(t *testing.T) {
 		t.Fatalf("Failed to create file: %v", err)
 	}
 
-	if err = fs.DeleteFile("file", fs.directoryManager.Current, fs.currentDirectoryInode); err != nil {
+	if err = fs.DeleteFile("file"); err != nil {
 		t.Fatalf("Failed to delete file: %v", err)
 	}
 
@@ -167,10 +167,10 @@ func TestDataFileComplexIdempotency(t *testing.T) {
 		t.Fatalf("Failed to change current directory: %v", err)
 	}
 
-	if err = fs.DeleteFile("dir", fs.directoryManager.Current, fs.currentDirectoryInode); err != nil {
+	if err = fs.DeleteFile("dir"); err != nil {
 		t.Fatalf("Failed to delete directory: %v", err)
 	}
-	if err = fs.DeleteFile("file", fs.directoryManager.Current, fs.currentDirectoryInode); err != nil {
+	if err = fs.DeleteFile("file"); err != nil {
 		t.Fatalf("Failed to delete file: %v", err)
 	}
 

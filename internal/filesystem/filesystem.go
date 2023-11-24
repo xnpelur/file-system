@@ -3,7 +3,6 @@ package filesystem
 import (
 	"file-system/internal/errs"
 	"file-system/internal/filesystem/bitmap"
-	"file-system/internal/filesystem/directory"
 	"file-system/internal/filesystem/inode"
 	"file-system/internal/filesystem/managers/blockmanager"
 	"file-system/internal/filesystem/managers/directorymanager"
@@ -26,16 +25,15 @@ var FilesystemConfig = Config{
 }
 
 type FileSystem struct {
-	superblock            *superblock.Superblock
-	blockBitmap           *bitmap.Bitmap
-	inodeBitmap           *bitmap.Bitmap
-	dataFile              *os.File
-	currentDirectoryInode *inode.Inode
-	currentUser           *user.User
-	nextUserId            uint16
-	inodeManager          *inodemanager.InodeManager
-	blockManager          *blockmanager.BlockManager
-	directoryManager      *directorymanager.DirectoryManager
+	dataFile         *os.File
+	superblock       *superblock.Superblock
+	blockBitmap      *bitmap.Bitmap
+	inodeBitmap      *bitmap.Bitmap
+	currentUser      *user.User
+	nextUserId       uint16
+	inodeManager     *inodemanager.InodeManager
+	blockManager     *blockmanager.BlockManager
+	directoryManager *directorymanager.DirectoryManager
 }
 
 func OpenFilesystem() (*FileSystem, error) {
@@ -52,34 +50,34 @@ func OpenFilesystem() (*FileSystem, error) {
 		return nil, err
 	}
 
+	blockBitmapOffset := fs.superblock.Size()
 	fs.blockBitmap, err = bitmap.ReadBitmapAt(
 		fs.dataFile,
-		fs.GetBlockBitmapOffset(),
+		blockBitmapOffset,
 		fs.superblock.BlockCount,
 	)
 	if err != nil {
 		return nil, err
 	}
 
+	inodeBitmapOffset := blockBitmapOffset + fs.blockBitmap.Size()
 	fs.inodeBitmap, err = bitmap.ReadBitmapAt(
 		fs.dataFile,
-		fs.GetInodeBitmapOffset(),
+		inodeBitmapOffset,
 		fs.superblock.InodeCount,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	fs.inodeManager = inodemanager.NewInodeManager(fs.dataFile, fs.superblock.InodeSize, fs.GetInodeTableOffset())
-	fs.blockManager = blockmanager.NewBlockManager(fs.dataFile, fs.superblock.BlockSize, fs.GetDataBlocksOffset())
-	fs.directoryManager = directorymanager.NewDirectoryManager(fs.dataFile, fs.superblock.BlockSize, fs.GetDataBlocksOffset())
+	fs.InitializeManagers()
 
-	fs.currentDirectoryInode, err = fs.inodeManager.ReadInode(0)
+	fs.directoryManager.CurrentInode, err = fs.inodeManager.ReadInode(0)
 	if err != nil {
 		return nil, err
 	}
 
-	if err = fs.directoryManager.OpenDirectory(fs.currentDirectoryInode.Blocks[0], "/"); err != nil {
+	if err = fs.directoryManager.OpenDirectory(fs.directoryManager.CurrentInode.Blocks[0], "/"); err != nil {
 		return nil, err
 	}
 
@@ -98,41 +96,44 @@ func FormatFilesystem(sizeInBytes uint32, blockSize uint32) (*FileSystem, error)
 	}
 
 	fs.superblock = superblock.NewSuperblock(sizeInBytes, blockSize, fs.dataFile)
-	fs.blockBitmap = bitmap.NewBitmap(fs.superblock.BlockCount, fs.dataFile, fs.GetBlockBitmapOffset())
-	fs.inodeBitmap = bitmap.NewBitmap(fs.superblock.InodeCount, fs.dataFile, fs.GetInodeBitmapOffset())
+	blockBitmapOffset := fs.superblock.Size()
+	fs.blockBitmap = bitmap.NewBitmap(fs.superblock.BlockCount, fs.dataFile, blockBitmapOffset)
+	inodeBitmapOffset := blockBitmapOffset + fs.blockBitmap.Size()
+	fs.inodeBitmap = bitmap.NewBitmap(fs.superblock.InodeCount, fs.dataFile, inodeBitmapOffset)
 
 	fs.superblock.Save()
 	fs.blockBitmap.Save()
 	fs.inodeBitmap.Save()
 
-	fs.inodeManager = inodemanager.NewInodeManager(fs.dataFile, fs.superblock.InodeSize, fs.GetInodeTableOffset())
-	fs.blockManager = blockmanager.NewBlockManager(fs.dataFile, fs.superblock.BlockSize, fs.GetDataBlocksOffset())
-	fs.directoryManager = directorymanager.NewDirectoryManager(fs.dataFile, fs.superblock.BlockSize, fs.GetDataBlocksOffset())
+	fs.InitializeManagers()
 
 	fs.inodeManager.ReserveInodeTableSpace(fs.superblock.InodeCount)
 	fs.blockManager.ReserveBlocksSpace(fs.superblock.BlockCount)
 
-	if err := fs.InitializeFileSystem(); err != nil {
+	fs.directoryManager.Path = "/"
+	if err := fs.CreateDirectory("/"); err != nil {
+		return nil, err
+	}
+	if err := fs.CreateDirectory(".users"); err != nil {
+		return nil, err
+	}
+	if err := fs.AddUser("root", "root", false); err != nil {
+		return nil, err
+	}
+	if err := fs.ChangeUser("root", "root"); err != nil {
 		return nil, err
 	}
 
 	return &fs, nil
 }
 
-func (fs *FileSystem) InitializeFileSystem() error {
-	if err := fs.CreateDirectory("/"); err != nil {
-		return err
-	}
-	fs.directoryManager.Path = "/"
+func (fs *FileSystem) InitializeManagers() {
+	inodeTableOffset := fs.superblock.Size() + fs.blockBitmap.Size() + fs.inodeBitmap.Size()
+	blocksOffset := inodeTableOffset + fs.superblock.InodeCount*fs.superblock.InodeSize
 
-	if err := fs.CreateDirectory(".users"); err != nil {
-		return err
-	}
-
-	if err := fs.AddUser("root", "root", false); err != nil {
-		return err
-	}
-	return fs.ChangeUser("root", "root")
+	fs.inodeManager = inodemanager.NewInodeManager(fs.dataFile, fs.superblock.InodeSize, inodeTableOffset)
+	fs.blockManager = blockmanager.NewBlockManager(fs.dataFile, fs.superblock.BlockSize, blocksOffset)
+	fs.directoryManager = directorymanager.NewDirectoryManager(fs.dataFile, fs.superblock.BlockSize, blocksOffset)
 }
 
 func (fs *FileSystem) AddUser(username, password string, withDirectory bool) error {
@@ -184,7 +185,7 @@ func (fs *FileSystem) ChangeUser(username, password string) error {
 
 func (fs *FileSystem) ChangeOwner(path string, username string) error {
 	currDir := fs.directoryManager.Current
-	currDirInode := fs.currentDirectoryInode
+	currDirInode := fs.directoryManager.CurrentInode
 	currPath := fs.directoryManager.Path
 
 	pathToFolder, fileName := utils.SplitPath(path)
@@ -215,7 +216,7 @@ func (fs *FileSystem) ChangeOwner(path string, username string) error {
 	fs.inodeManager.SaveInode(fileInode, inodeIndex)
 
 	fs.directoryManager.Current = currDir
-	fs.currentDirectoryInode = currDirInode
+	fs.directoryManager.CurrentInode = currDirInode
 	fs.directoryManager.Path = currPath
 
 	return nil
@@ -235,7 +236,7 @@ func (fs *FileSystem) CreateDirectory(path string) error {
 
 func (fs *FileSystem) CreateEntity(path string, isFile bool, content string) error {
 	currDir := fs.directoryManager.Current
-	currDirInode := fs.currentDirectoryInode
+	currDirInode := fs.directoryManager.CurrentInode
 	currPath := fs.directoryManager.Path
 
 	pathToFolder, name := utils.SplitPath(path)
@@ -248,7 +249,7 @@ func (fs *FileSystem) CreateEntity(path string, isFile bool, content string) err
 			return fmt.Errorf("%w - %s", errs.ErrRecordAlreadyExists, name)
 		}
 
-		if fs.currentUser != nil && !fs.currentDirectoryInode.HasWritePermission(*fs.currentUser) {
+		if fs.currentUser != nil && !fs.directoryManager.CurrentInode.HasWritePermission(*fs.currentUser) {
 			return fmt.Errorf("%w - %s", errs.ErrPermissionDenied, name)
 		}
 	}
@@ -289,48 +290,40 @@ func (fs *FileSystem) CreateEntity(path string, isFile bool, content string) err
 			}
 		}
 	} else {
-		var currDirInodeIndex uint32
-		if path != "/" {
-			currDirInodeIndex, err = fs.directoryManager.Current.GetInode(".")
-			if err != nil {
-				return err
-			}
-		}
-		newDir := directory.NewDirectory(inodeIndex, currDirInodeIndex)
-		newDir.WriteAt(fs.dataFile, fs.GetDataBlocksOffset()+blockIndex*fs.superblock.BlockSize)
+		newDir, _ := fs.directoryManager.CreateNewDirectory(inodeIndex, blockIndex, path)
 		if path == "/" {
 			fs.directoryManager.Current = newDir
-			fs.currentDirectoryInode, err = fs.inodeManager.ReadInode(inodeIndex)
-			if err != nil {
-				return err
-			}
+			fs.directoryManager.CurrentInode, _ = fs.inodeManager.ReadInode(inodeIndex)
 		}
 	}
 
 	if path != "/" {
 		fs.directoryManager.Current.AddFile(inodeIndex, name)
-		offset := fs.GetDataBlocksOffset() + fs.currentDirectoryInode.Blocks[0]*fs.superblock.BlockSize
-		fs.directoryManager.Current.WriteAt(fs.dataFile, offset)
+		fs.directoryManager.SaveCurrentDirectory()
 
 		fs.directoryManager.Current = currDir
-		fs.currentDirectoryInode = currDirInode
+		fs.directoryManager.CurrentInode = currDirInode
 		fs.directoryManager.Path = currPath
 	}
 
 	return nil
 }
 
-func (fs *FileSystem) DeleteFile(name string, fromDirectory *directory.Directory, fromInode *inode.Inode) error {
+func (fs *FileSystem) DeleteFile(path string) error {
+	currDir := fs.directoryManager.Current
+	currDirInode := fs.directoryManager.CurrentInode
+	currPath := fs.directoryManager.Path
+
+	pathToFolder, name := utils.SplitPath(path)
+	if pathToFolder != "" {
+		fs.ChangeDirectory(pathToFolder)
+	}
+
 	if name == "." || name == ".." {
 		return fmt.Errorf("%w - %s", errs.ErrIllegalArgument, name)
 	}
 
-	if fromDirectory == nil || fromInode == nil {
-		fromDirectory = fs.directoryManager.Current
-		fromInode = fs.currentDirectoryInode
-	}
-
-	inodeIndex, err := fromDirectory.GetInode(name)
+	inodeIndex, err := fs.directoryManager.Current.GetInode(name)
 	if err != nil {
 		return err
 	}
@@ -340,46 +333,47 @@ func (fs *FileSystem) DeleteFile(name string, fromDirectory *directory.Directory
 		return err
 	}
 
+	if !fileInode.HasWritePermission(*fs.currentUser) {
+		return fmt.Errorf("%w - %s", errs.ErrPermissionDenied, name)
+	}
+
 	if !fileInode.IsFile() {
-		dirOffset := fs.GetDataBlocksOffset() + fileInode.Blocks[0]*fs.superblock.BlockSize
-		dir, err := directory.ReadDirectoryAt(fs.dataFile, dirOffset)
-		if err != nil {
-			return err
-		}
-		for _, name := range dir.GetRecords() {
+		fs.ChangeDirectory(name)
+		for _, name := range fs.directoryManager.Current.GetRecords() {
 			if name == "." || name == ".." {
 				continue
 			}
-			err := fs.DeleteFile(name, dir, fileInode)
+			err := fs.DeleteFile(name)
 			if err != nil {
 				return err
 			}
 		}
+		fs.ChangeDirectory("..")
 	}
 
-	fromDirectory.DeleteFile(name)
+	fs.directoryManager.Current.DeleteFile(name)
 
-	err = fs.blockBitmap.SetBit(fileInode.Blocks[0], 0)
-	if err != nil {
-		return err
-	}
-	err = fs.inodeBitmap.SetBit(inodeIndex, 0)
-	if err != nil {
-		return err
-	}
+	fs.blockBitmap.SetBit(fileInode.Blocks[0], 0)
+	fs.inodeBitmap.SetBit(inodeIndex, 0)
+
 	fs.superblock.FreeBlockCount++
 	fs.superblock.FreeInodeCount++
 
 	fs.blockManager.ResetBlock(fileInode.Blocks[0])
-	fs.blockManager.ResetBlock(fromInode.Blocks[0])
+	fs.blockManager.ResetBlock(fs.directoryManager.CurrentInode.Blocks[0])
 	fs.inodeManager.ResetInode(inodeIndex)
 
-	offset := fs.GetDataBlocksOffset() + fromInode.Blocks[0]*fs.superblock.BlockSize
-	fromDirectory.WriteAt(fs.dataFile, offset)
+	fs.directoryManager.SaveCurrentDirectory()
 
 	fs.blockBitmap.Save()
 	fs.inodeBitmap.Save()
 	fs.superblock.Save()
+
+	if pathToFolder != "" {
+		fs.directoryManager.Current = currDir
+		fs.directoryManager.CurrentInode = currDirInode
+		fs.directoryManager.Path = currPath
+	}
 
 	return nil
 }
@@ -389,7 +383,7 @@ func (fs *FileSystem) ChangeDirectory(path string) error {
 	dirs := strings.Split(path, "/")
 
 	currDir := fs.directoryManager.Current
-	currDirInode := fs.currentDirectoryInode
+	currDirInode := fs.directoryManager.CurrentInode
 	currPath := fs.directoryManager.Path
 
 	for i, dirName := range dirs {
@@ -418,8 +412,7 @@ func (fs *FileSystem) ChangeDirectory(path string) error {
 			return fmt.Errorf("%w - %s", errs.ErrRecordIsNotDirectory, dirName)
 		}
 
-		dirOffset := fs.GetDataBlocksOffset() + dirInode.Blocks[0]*fs.superblock.BlockSize
-		dir, err := directory.ReadDirectoryAt(fs.dataFile, dirOffset)
+		dir, err := fs.directoryManager.ReadDirectory(dirInode.Blocks[0])
 		if err != nil {
 			return err
 		}
@@ -434,7 +427,7 @@ func (fs *FileSystem) ChangeDirectory(path string) error {
 	}
 
 	fs.directoryManager.Current = currDir
-	fs.currentDirectoryInode = currDirInode
+	fs.directoryManager.CurrentInode = currDirInode
 	fs.directoryManager.Path = currPath
 
 	return nil
@@ -463,7 +456,7 @@ func (fs FileSystem) GetCurrentDirectoryRecords(long bool) []string {
 
 func (fs FileSystem) ReadFile(path string) (string, error) {
 	currDir := fs.directoryManager.Current
-	currDirInode := fs.currentDirectoryInode
+	currDirInode := fs.directoryManager.CurrentInode
 	currPath := fs.directoryManager.Path
 
 	pathToFolder, name := utils.SplitPath(path)
@@ -491,7 +484,7 @@ func (fs FileSystem) ReadFile(path string) (string, error) {
 	}
 
 	fs.directoryManager.Current = currDir
-	fs.currentDirectoryInode = currDirInode
+	fs.directoryManager.CurrentInode = currDirInode
 	fs.directoryManager.Path = currPath
 
 	return str, nil
@@ -499,7 +492,7 @@ func (fs FileSystem) ReadFile(path string) (string, error) {
 
 func (fs FileSystem) EditFile(path string, content string) error {
 	currDir := fs.directoryManager.Current
-	currDirInode := fs.currentDirectoryInode
+	currDirInode := fs.directoryManager.CurrentInode
 	currPath := fs.directoryManager.Path
 
 	pathToFolder, name := utils.SplitPath(path)
@@ -532,7 +525,7 @@ func (fs FileSystem) EditFile(path string, content string) error {
 	fs.inodeManager.SaveInode(fileInode, inodeIndex)
 
 	fs.directoryManager.Current = currDir
-	fs.currentDirectoryInode = currDirInode
+	fs.directoryManager.CurrentInode = currDirInode
 	fs.directoryManager.Path = currPath
 
 	return nil
@@ -540,7 +533,7 @@ func (fs FileSystem) EditFile(path string, content string) error {
 
 func (fs *FileSystem) ChangePermissions(path string, value int) error {
 	currDir := fs.directoryManager.Current
-	currDirInode := fs.currentDirectoryInode
+	currDirInode := fs.directoryManager.CurrentInode
 	currPath := fs.directoryManager.Path
 
 	pathToFolder, name := utils.SplitPath(path)
@@ -570,7 +563,7 @@ func (fs *FileSystem) ChangePermissions(path string, value int) error {
 	fs.inodeManager.SaveInode(fileInode, inodeIndex)
 
 	fs.directoryManager.Current = currDir
-	fs.currentDirectoryInode = currDirInode
+	fs.directoryManager.CurrentInode = currDirInode
 	fs.directoryManager.Path = currPath
 
 	return nil
@@ -582,22 +575,6 @@ func (fs FileSystem) GetCurrentPath() string {
 
 func (fs FileSystem) GetCurrentUserName() string {
 	return fs.currentUser.Username
-}
-
-func (fs FileSystem) GetBlockBitmapOffset() uint32 {
-	return fs.superblock.Size()
-}
-
-func (fs FileSystem) GetInodeBitmapOffset() uint32 {
-	return fs.GetBlockBitmapOffset() + fs.blockBitmap.Size()
-}
-
-func (fs FileSystem) GetInodeTableOffset() uint32 {
-	return fs.GetInodeBitmapOffset() + fs.inodeBitmap.Size()
-}
-
-func (fs FileSystem) GetDataBlocksOffset() uint32 {
-	return fs.GetInodeTableOffset() + fs.superblock.InodeCount*fs.superblock.InodeSize
 }
 
 func (fs *FileSystem) CloseDataFile() error {
