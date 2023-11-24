@@ -7,6 +7,7 @@ import (
 	"file-system/internal/filesystem/managers/blockmanager"
 	"file-system/internal/filesystem/managers/directorymanager"
 	"file-system/internal/filesystem/managers/inodemanager"
+	"file-system/internal/filesystem/managers/usermanager"
 	"file-system/internal/filesystem/superblock"
 	"file-system/internal/filesystem/user"
 	"file-system/internal/utils"
@@ -29,11 +30,10 @@ type FileSystem struct {
 	superblock       *superblock.Superblock
 	blockBitmap      *bitmap.Bitmap
 	inodeBitmap      *bitmap.Bitmap
-	currentUser      *user.User
-	nextUserId       uint16
 	inodeManager     *inodemanager.InodeManager
 	blockManager     *blockmanager.BlockManager
 	directoryManager *directorymanager.DirectoryManager
+	userManager      *usermanager.UserManager
 }
 
 func OpenFilesystem() (*FileSystem, error) {
@@ -81,7 +81,13 @@ func OpenFilesystem() (*FileSystem, error) {
 		return nil, err
 	}
 
-	fs.ChangeUser("root", "root")
+	if err = fs.ChangeUser("root", "root"); err != nil {
+		return nil, err
+	}
+
+	if err = fs.LoadUserManagerData(); err != nil {
+		return nil, err
+	}
 
 	return &fs, nil
 }
@@ -117,7 +123,7 @@ func FormatFilesystem(sizeInBytes uint32, blockSize uint32) (*FileSystem, error)
 	if err := fs.CreateDirectory(".users"); err != nil {
 		return nil, err
 	}
-	if err := fs.AddUser("root", "root", false); err != nil {
+	if err := fs.AddUser("root", "root"); err != nil {
 		return nil, err
 	}
 	if err := fs.ChangeUser("root", "root"); err != nil {
@@ -134,17 +140,47 @@ func (fs *FileSystem) InitializeManagers() {
 	fs.inodeManager = inodemanager.NewInodeManager(fs.dataFile, fs.superblock.InodeSize, inodeTableOffset)
 	fs.blockManager = blockmanager.NewBlockManager(fs.dataFile, fs.superblock.BlockSize, blocksOffset)
 	fs.directoryManager = directorymanager.NewDirectoryManager(fs.dataFile, fs.superblock.BlockSize, blocksOffset)
+	fs.userManager = usermanager.NewUserManager()
 }
 
-func (fs *FileSystem) AddUser(username, password string, withDirectory bool) error {
-	newUser := user.NewUser(username, fs.nextUserId, password)
-	fs.nextUserId++
+func (fs *FileSystem) LoadUserManagerData() error {
+	var err error
+	if err = fs.ChangeDirectory(".users"); err != nil {
+		return err
+	}
+
+	users := make(map[uint16]string)
+	for _, name := range fs.GetCurrentDirectoryRecords(false) {
+		if name == "." || name == ".." {
+			continue
+		}
+
+		content, err := fs.ReadFile(fmt.Sprintf("/.users/%s", name))
+		if err != nil {
+			return err
+		}
+		userId, err := user.GetUserIdFromString(content)
+		if err != nil {
+			return err
+		}
+		users[userId] = name
+	}
+	fs.userManager.LoadUsers(users)
+
+	if err = fs.ChangeDirectory(".."); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (fs *FileSystem) AddUser(username, password string) error {
+	newUser := fs.userManager.CreateNewUser(username, password)
 
 	if err := fs.CreateFileWithContent(fmt.Sprintf("/.users/%s", username), newUser.GetUserString()); err != nil {
 		return err
 	}
 
-	if withDirectory {
+	if newUser.UserId != 0 {
 		userDirPath := fmt.Sprintf("/%s", username)
 
 		if err := fs.CreateDirectory(userDirPath); err != nil {
@@ -171,7 +207,7 @@ func (fs *FileSystem) ChangeUser(username, password string) error {
 	}
 
 	fs.ChangeDirectory("/")
-	fs.currentUser = u
+	fs.userManager.Current = u
 
 	if username != "root" {
 		userDirPath := fmt.Sprintf("/%s", username)
@@ -190,7 +226,13 @@ func (fs *FileSystem) ChangeOwner(path string, username string) error {
 
 	pathToFolder, fileName := utils.SplitPath(path)
 	if pathToFolder != "" {
-		fs.ChangeDirectory(pathToFolder)
+		err := fs.ChangeDirectory(pathToFolder)
+		if err != nil {
+			fs.directoryManager.Current = currDir
+			fs.directoryManager.CurrentInode = currDirInode
+			fs.directoryManager.Path = currPath
+			return err
+		}
 	}
 
 	inodeIndex, err := fs.directoryManager.Current.GetInode(fileName)
@@ -241,7 +283,13 @@ func (fs *FileSystem) CreateEntity(path string, isFile bool, content string) err
 
 	pathToFolder, name := utils.SplitPath(path)
 	if pathToFolder != "" {
-		fs.ChangeDirectory(pathToFolder)
+		err := fs.ChangeDirectory(pathToFolder)
+		if err != nil {
+			fs.directoryManager.Current = currDir
+			fs.directoryManager.CurrentInode = currDirInode
+			fs.directoryManager.Path = currPath
+			return err
+		}
 	}
 
 	if path != "/" {
@@ -249,7 +297,7 @@ func (fs *FileSystem) CreateEntity(path string, isFile bool, content string) err
 			return fmt.Errorf("%w - %s", errs.ErrRecordAlreadyExists, name)
 		}
 
-		if fs.currentUser != nil && !fs.directoryManager.CurrentInode.HasWritePermission(*fs.currentUser) {
+		if fs.userManager.Current != nil && !fs.directoryManager.CurrentInode.HasWritePermission(*fs.userManager.Current) {
 			return fmt.Errorf("%w - %s", errs.ErrPermissionDenied, name)
 		}
 	}
@@ -271,8 +319,8 @@ func (fs *FileSystem) CreateEntity(path string, isFile bool, content string) err
 	fs.inodeBitmap.Save()
 
 	var userId uint16
-	if fs.currentUser != nil {
-		userId = fs.currentUser.UserId
+	if fs.userManager != nil && fs.userManager.Current != nil {
+		userId = fs.userManager.Current.UserId
 	}
 
 	fileInode, err := inode.NewInode(isFile, 64, userId, []uint32{blockIndex})
@@ -316,7 +364,13 @@ func (fs *FileSystem) DeleteFile(path string) error {
 
 	pathToFolder, name := utils.SplitPath(path)
 	if pathToFolder != "" {
-		fs.ChangeDirectory(pathToFolder)
+		err := fs.ChangeDirectory(pathToFolder)
+		if err != nil {
+			fs.directoryManager.Current = currDir
+			fs.directoryManager.CurrentInode = currDirInode
+			fs.directoryManager.Path = currPath
+			return err
+		}
 	}
 
 	if name == "." || name == ".." {
@@ -333,7 +387,7 @@ func (fs *FileSystem) DeleteFile(path string) error {
 		return err
 	}
 
-	if !fileInode.HasWritePermission(*fs.currentUser) {
+	if !fileInode.HasWritePermission(*fs.userManager.Current) {
 		return fmt.Errorf("%w - %s", errs.ErrPermissionDenied, name)
 	}
 
@@ -404,7 +458,7 @@ func (fs *FileSystem) ChangeDirectory(path string) error {
 			return err
 		}
 
-		if fs.currentUser != nil && !dirInode.HasReadPermission(*fs.currentUser) {
+		if fs.userManager.Current != nil && !dirInode.HasReadPermission(*fs.userManager.Current) {
 			return fmt.Errorf("%w - cd %s", errs.ErrPermissionDenied, dirName)
 		}
 
@@ -461,7 +515,13 @@ func (fs FileSystem) ReadFile(path string) (string, error) {
 
 	pathToFolder, name := utils.SplitPath(path)
 	if pathToFolder != "" {
-		fs.ChangeDirectory(pathToFolder)
+		err := fs.ChangeDirectory(pathToFolder)
+		if err != nil {
+			fs.directoryManager.Current = currDir
+			fs.directoryManager.CurrentInode = currDirInode
+			fs.directoryManager.Path = currPath
+			return "", err
+		}
 	}
 
 	inodeIndex, err := fs.directoryManager.Current.GetInode(name)
@@ -474,7 +534,7 @@ func (fs FileSystem) ReadFile(path string) (string, error) {
 		return "", err
 	}
 
-	if fs.currentUser != nil && !fileInode.HasReadPermission(*fs.currentUser) {
+	if fs.userManager.Current != nil && !fileInode.HasReadPermission(*fs.userManager.Current) {
 		return "", fmt.Errorf("%w - read %s", errs.ErrPermissionDenied, name)
 	}
 
@@ -497,7 +557,13 @@ func (fs FileSystem) EditFile(path string, content string) error {
 
 	pathToFolder, name := utils.SplitPath(path)
 	if pathToFolder != "" {
-		fs.ChangeDirectory(pathToFolder)
+		err := fs.ChangeDirectory(pathToFolder)
+		if err != nil {
+			fs.directoryManager.Current = currDir
+			fs.directoryManager.CurrentInode = currDirInode
+			fs.directoryManager.Path = currPath
+			return err
+		}
 	}
 
 	inodeIndex, err := fs.directoryManager.Current.GetInode(name)
@@ -510,7 +576,7 @@ func (fs FileSystem) EditFile(path string, content string) error {
 		return err
 	}
 
-	if !fileInode.HasWritePermission(*fs.currentUser) {
+	if !fileInode.HasWritePermission(*fs.userManager.Current) {
 		return fmt.Errorf("%w - %s", errs.ErrPermissionDenied, name)
 	}
 
@@ -538,7 +604,13 @@ func (fs *FileSystem) ChangePermissions(path string, value int) error {
 
 	pathToFolder, name := utils.SplitPath(path)
 	if pathToFolder != "" {
-		fs.ChangeDirectory(pathToFolder)
+		err := fs.ChangeDirectory(pathToFolder)
+		if err != nil {
+			fs.directoryManager.Current = currDir
+			fs.directoryManager.CurrentInode = currDirInode
+			fs.directoryManager.Path = currPath
+			return err
+		}
 	}
 
 	inodeIndex, err := fs.directoryManager.Current.GetInode(name)
@@ -551,7 +623,7 @@ func (fs *FileSystem) ChangePermissions(path string, value int) error {
 		return err
 	}
 
-	if fs.currentUser.UserId != fileInode.UserId {
+	if fs.userManager.Current.UserId != fileInode.UserId {
 		return fmt.Errorf("%w - chmod %s", errs.ErrPermissionDenied, name)
 	}
 
@@ -574,7 +646,7 @@ func (fs FileSystem) GetCurrentPath() string {
 }
 
 func (fs FileSystem) GetCurrentUserName() string {
-	return fs.currentUser.Username
+	return fs.userManager.Current.Username
 }
 
 func (fs *FileSystem) CloseDataFile() error {
