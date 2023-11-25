@@ -104,6 +104,11 @@ func (m *Menu) executeCommand(command string, args []string) error {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
 		return m.fileSystem.AppendToFile(args[0], args[1])
+	case "move":
+		if len(args) < 2 {
+			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
+		}
+		return m.fileSystem.MoveFile(args[0], args[1])
 	case "read":
 		if len(args) < 1 {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)

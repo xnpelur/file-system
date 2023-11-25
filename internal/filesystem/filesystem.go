@@ -644,6 +644,55 @@ func (fs *FileSystem) AppendToFile(path string, content string) error {
 	return fs.EditFile(path, original+content)
 }
 
+func (fs *FileSystem) MoveFile(pathFrom string, pathTo string) error {
+	currDir := fs.directoryManager.Current
+	currDirInode := fs.directoryManager.CurrentInode
+	currPath := fs.directoryManager.Path
+
+	pathToFolderFrom, nameFrom := utils.SplitPath(pathFrom)
+	if pathToFolderFrom != "" {
+		err := fs.ChangeDirectory(pathToFolderFrom)
+		if err != nil {
+			fs.directoryManager.Current = currDir
+			fs.directoryManager.CurrentInode = currDirInode
+			fs.directoryManager.Path = currPath
+			return err
+		}
+	}
+
+	inodeIndex, err := fs.directoryManager.Current.GetInode(nameFrom)
+	if err != nil {
+		return nil
+	}
+
+	fs.directoryManager.Current.DeleteFile(nameFrom)
+	fs.directoryManager.SaveCurrentDirectory()
+
+	fs.directoryManager.Current = currDir
+	fs.directoryManager.CurrentInode = currDirInode
+	fs.directoryManager.Path = currPath
+
+	pathToFolderTo, nameTo := utils.SplitPath(pathTo)
+	if pathToFolderTo != "" {
+		err := fs.ChangeDirectory(pathToFolderTo)
+		if err != nil {
+			fs.directoryManager.Current = currDir
+			fs.directoryManager.CurrentInode = currDirInode
+			fs.directoryManager.Path = currPath
+			return err
+		}
+	}
+
+	fs.directoryManager.Current.AddFile(inodeIndex, nameTo)
+	fs.directoryManager.SaveCurrentDirectory()
+
+	fs.directoryManager.Current = currDir
+	fs.directoryManager.CurrentInode = currDirInode
+	fs.directoryManager.Path = currPath
+
+	return nil
+}
+
 func (fs *FileSystem) ChangePermissions(path string, value int) error {
 	currDir := fs.directoryManager.Current
 	currDirInode := fs.directoryManager.CurrentInode
