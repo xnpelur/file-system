@@ -693,6 +693,71 @@ func (fs *FileSystem) MoveFile(pathFrom string, pathTo string) error {
 	return nil
 }
 
+func (fs *FileSystem) CopyFile(pathFrom string, pathTo string) error {
+	currDir := fs.directoryManager.Current
+	currDirInode := fs.directoryManager.CurrentInode
+	currPath := fs.directoryManager.Path
+
+	pathToFolderFrom, nameFrom := utils.SplitPath(pathFrom)
+	if pathToFolderFrom != "" {
+		err := fs.ChangeDirectory(pathToFolderFrom)
+		if err != nil {
+			fs.directoryManager.Current = currDir
+			fs.directoryManager.CurrentInode = currDirInode
+			fs.directoryManager.Path = currPath
+			return err
+		}
+	}
+
+	inodeIndex, err := fs.directoryManager.Current.GetInode(nameFrom)
+	if err != nil {
+		return nil
+	}
+
+	fileInode, err := fs.inodeManager.ReadInode(inodeIndex)
+	if err != nil {
+		return nil
+	}
+
+	if !fileInode.IsFile() {
+		return fmt.Errorf("not implemented yet")
+	}
+
+	if fs.userManager.Current != nil && !fileInode.HasReadPermission(*fs.userManager.Current) {
+		return fmt.Errorf("%w - copy %s", errs.ErrPermissionDenied, nameFrom)
+	}
+
+	str, err := fs.blockManager.ReadBlock(fileInode.Blocks[0], nameFrom)
+	if err != nil {
+		return err
+	}
+
+	fs.directoryManager.Current = currDir
+	fs.directoryManager.CurrentInode = currDirInode
+	fs.directoryManager.Path = currPath
+
+	pathToFolderTo, nameTo := utils.SplitPath(pathTo)
+	if pathToFolderTo != "" {
+		err := fs.ChangeDirectory(pathToFolderTo)
+		if err != nil {
+			fs.directoryManager.Current = currDir
+			fs.directoryManager.CurrentInode = currDirInode
+			fs.directoryManager.Path = currPath
+			return err
+		}
+	}
+
+	if err = fs.CreateFileWithContent(nameTo, str); err != nil {
+		return err
+	}
+
+	fs.directoryManager.Current = currDir
+	fs.directoryManager.CurrentInode = currDirInode
+	fs.directoryManager.Path = currPath
+
+	return nil
+}
+
 func (fs *FileSystem) ChangePermissions(path string, value int) error {
 	currDir := fs.directoryManager.Current
 	currDirInode := fs.directoryManager.CurrentInode
