@@ -95,15 +95,15 @@ func (m *Menu) executeCommand(command string, args []string) error {
 		}
 		return m.fileSystem.CreateEmptyFile(fileName)
 	case "edit":
-		if len(args) < 1 {
+		if len(args) < 2 {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
-		fileName := args[0]
-		fileContent := ""
-		if len(args) > 1 {
-			fileContent = args[1]
+		return m.fileSystem.EditFile(args[0], args[1])
+	case "append":
+		if len(args) < 2 {
+			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
-		return m.fileSystem.EditFile(fileName, fileContent)
+		return m.fileSystem.AppendToFile(args[0], args[1])
 	case "read":
 		if len(args) < 1 {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)

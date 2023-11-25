@@ -636,6 +636,14 @@ func (fs FileSystem) EditFile(path string, content string) error {
 	return nil
 }
 
+func (fs *FileSystem) AppendToFile(path string, content string) error {
+	original, err := fs.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	return fs.EditFile(path, original+content)
+}
+
 func (fs *FileSystem) ChangePermissions(path string, value int) error {
 	currDir := fs.directoryManager.Current
 	currDirInode := fs.directoryManager.CurrentInode
