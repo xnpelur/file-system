@@ -33,3 +33,7 @@ func (um *UserManager) LoadUsers(users map[uint16]string) {
 func (um *UserManager) GetUsername(userId uint16) string {
 	return um.users[userId]
 }
+
+func (um *UserManager) DeleteUser(userId uint16) {
+	delete(um.users, userId)
+}

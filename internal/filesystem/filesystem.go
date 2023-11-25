@@ -219,6 +219,33 @@ func (fs *FileSystem) ChangeUser(username, password string) error {
 	return nil
 }
 
+func (fs *FileSystem) DeleteUser(username string) error {
+	if fs.userManager.Current.UserId != 0 {
+		return errs.ErrPermissionDenied
+	}
+
+	content, err := fs.ReadFile(fmt.Sprintf("/.users/%s", username))
+	if err != nil {
+		return err
+	}
+	userId, err := user.GetUserIdFromString(content)
+	if err != nil {
+		return nil
+	}
+
+	fs.userManager.DeleteUser(userId)
+
+	if err := fs.DeleteFile(fmt.Sprintf("/.users/%s", username)); err != nil {
+		return err
+	}
+
+	if err := fs.DeleteFile(fmt.Sprintf("/%s", username)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (fs *FileSystem) ChangeOwner(path string, username string) error {
 	currDir := fs.directoryManager.Current
 	currDirInode := fs.directoryManager.CurrentInode
@@ -635,7 +662,7 @@ func (fs *FileSystem) ChangePermissions(path string, value int) error {
 		return err
 	}
 
-	if fs.userManager.Current.UserId != fileInode.UserId {
+	if !fileInode.HasWritePermission(*fs.userManager.Current) {
 		return fmt.Errorf("%w - chmod %s", errs.ErrPermissionDenied, name)
 	}
 

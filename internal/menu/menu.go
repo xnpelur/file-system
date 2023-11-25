@@ -154,6 +154,11 @@ func (m *Menu) executeCommand(command string, args []string) error {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
 		return m.fileSystem.AddUser(args[0], args[1])
+	case "deleteuser":
+		if len(args) < 1 {
+			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
+		}
+		return m.fileSystem.DeleteUser(args[0])
 	case "chmod":
 		if len(args) < 1 {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
