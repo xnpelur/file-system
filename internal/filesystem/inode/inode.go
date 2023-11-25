@@ -21,6 +21,7 @@ type Inode struct {
 
 func NewInode(
 	isFile bool,
+	isHidden bool,
 	numericPermissions int,
 	userId uint16,
 	dataBlocks []uint32,
@@ -33,7 +34,7 @@ func NewInode(
 		blocks[i] = dataBlock
 	}
 
-	tap, err := getTapValue(isFile, numericPermissions)
+	tap, err := getTapValue(isFile, isHidden, numericPermissions)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +49,7 @@ func NewInode(
 	}, nil
 }
 
-func getTapValue(isFile bool, numericPermissions int) (uint8, error) {
+func getTapValue(isFile bool, isHidden bool, numericPermissions int) (uint8, error) {
 	strNumber := strconv.FormatInt(int64(numericPermissions), 10)
 	decimalNumber, err := strconv.ParseUint(strNumber, 8, 8)
 	if err != nil {
@@ -58,6 +59,9 @@ func getTapValue(isFile bool, numericPermissions int) (uint8, error) {
 	value := uint8(decimalNumber)
 	if isFile {
 		value |= 0b10000000
+	}
+	if isHidden {
+		value |= 0b01000000
 	}
 
 	return value, nil
@@ -119,7 +123,7 @@ func (inode Inode) GetTypeAndPermissionString() string {
 }
 
 func (inode *Inode) ChangePermissions(value int) error {
-	tap, err := getTapValue(inode.IsFile(), value)
+	tap, err := getTapValue(inode.IsFile(), inode.IsHidden(), value)
 	if err != nil {
 		return err
 	}
@@ -128,6 +132,9 @@ func (inode *Inode) ChangePermissions(value int) error {
 }
 
 func (inode Inode) HasReadPermission(user user.User) bool {
+	if user.UserId == 0 {
+		return true
+	}
 	ownerReadAccess := inode.TypeAndPermissions&0b00100000 != 0
 	usersReadAccess := inode.TypeAndPermissions&0b00000100 != 0
 
@@ -135,6 +142,9 @@ func (inode Inode) HasReadPermission(user user.User) bool {
 }
 
 func (inode Inode) HasWritePermission(user user.User) bool {
+	if user.UserId == 0 {
+		return true
+	}
 	ownerWriteAccess := inode.TypeAndPermissions&0b00010000 != 0
 	usersWriteAccess := inode.TypeAndPermissions&0b00000010 != 0
 
@@ -143,6 +153,10 @@ func (inode Inode) HasWritePermission(user user.User) bool {
 
 func (inode Inode) IsFile() bool {
 	return inode.TypeAndPermissions&0b10000000 != 0
+}
+
+func (inode Inode) IsHidden() bool {
+	return inode.TypeAndPermissions&0b01000000 != 0
 }
 
 func (inode Inode) WriteAt(file *os.File, offset uint32) error {
@@ -156,18 +170,18 @@ func (inode Inode) WriteAt(file *os.File, offset uint32) error {
 	return nil
 }
 
-func (value Inode) encode() []byte {
+func (inode Inode) encode() []byte {
 	data := make([]byte, 65)
 
-	data[0] = value.TypeAndPermissions
-	binary.BigEndian.PutUint16(data[1:3], value.UserId)
-	binary.BigEndian.PutUint32(data[3:7], value.FileSize)
-	binary.BigEndian.PutUint32(data[7:11], value.CreationTime)
-	binary.BigEndian.PutUint32(data[11:15], value.ModificationTime)
+	data[0] = inode.TypeAndPermissions
+	binary.BigEndian.PutUint16(data[1:3], inode.UserId)
+	binary.BigEndian.PutUint32(data[3:7], inode.FileSize)
+	binary.BigEndian.PutUint32(data[7:11], inode.CreationTime)
+	binary.BigEndian.PutUint32(data[11:15], inode.ModificationTime)
 
 	for i := 0; i < 12; i++ {
 		offset := 15 + i*4
-		binary.BigEndian.PutUint32(data[offset:offset+4], value.Blocks[i])
+		binary.BigEndian.PutUint32(data[offset:offset+4], inode.Blocks[i])
 	}
 
 	return data

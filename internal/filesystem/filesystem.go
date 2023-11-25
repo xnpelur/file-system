@@ -120,7 +120,7 @@ func FormatFilesystem(sizeInBytes uint32, blockSize uint32) (*FileSystem, error)
 	if err := fs.CreateDirectory("/"); err != nil {
 		return nil, err
 	}
-	if err := fs.CreateDirectory(".users"); err != nil {
+	if err := fs.CreateHiddenDirectory(".users"); err != nil {
 		return nil, err
 	}
 	if err := fs.AddUser("root", "root"); err != nil {
@@ -265,18 +265,22 @@ func (fs *FileSystem) ChangeOwner(path string, username string) error {
 }
 
 func (fs *FileSystem) CreateEmptyFile(path string) error {
-	return fs.CreateEntity(path, true, "")
+	return fs.CreateEntity(path, true, "", false)
 }
 
 func (fs *FileSystem) CreateFileWithContent(path, content string) error {
-	return fs.CreateEntity(path, true, content)
+	return fs.CreateEntity(path, true, content, false)
 }
 
 func (fs *FileSystem) CreateDirectory(path string) error {
-	return fs.CreateEntity(path, false, "")
+	return fs.CreateEntity(path, false, "", false)
 }
 
-func (fs *FileSystem) CreateEntity(path string, isFile bool, content string) error {
+func (fs *FileSystem) CreateHiddenDirectory(path string) error {
+	return fs.CreateEntity(path, false, "", true)
+}
+
+func (fs *FileSystem) CreateEntity(path string, isFile bool, content string, hidden bool) error {
 	currDir := fs.directoryManager.Current
 	currDirInode := fs.directoryManager.CurrentInode
 	currPath := fs.directoryManager.Path
@@ -323,7 +327,7 @@ func (fs *FileSystem) CreateEntity(path string, isFile bool, content string) err
 		userId = fs.userManager.Current.UserId
 	}
 
-	fileInode, err := inode.NewInode(isFile, 64, userId, []uint32{blockIndex})
+	fileInode, err := inode.NewInode(isFile, hidden, 64, userId, []uint32{blockIndex})
 	if err != nil {
 		return err
 	}
@@ -488,16 +492,21 @@ func (fs *FileSystem) ChangeDirectory(path string) error {
 }
 
 func (fs FileSystem) GetCurrentDirectoryRecords(long bool) []string {
-	if !long {
-		return fs.directoryManager.Current.GetRecords()
-	}
-
 	recordNames := fs.directoryManager.Current.GetRecords()
 
-	result := make([]string, len(recordNames))
-	for i, name := range recordNames {
+	result := make([]string, 0, len(recordNames))
+	for _, name := range recordNames {
 		recordInodeIndex, _ := fs.directoryManager.Current.GetInode(name)
 		recordInode, _ := fs.inodeManager.ReadInode(recordInodeIndex)
+
+		if recordInode.IsHidden() {
+			continue
+		}
+
+		if !long {
+			result = append(result, name)
+			continue
+		}
 
 		tapString := recordInode.GetTypeAndPermissionString()
 		ownerUsername := fs.userManager.GetUsername(recordInode.UserId)
@@ -505,7 +514,7 @@ func (fs FileSystem) GetCurrentDirectoryRecords(long bool) []string {
 		modificationTime := time.Unix(int64(recordInode.ModificationTime), 0)
 		modificationTimeString := modificationTime.Format("Jan 2 15:04")
 
-		result[i] = fmt.Sprintf("%s\t%s\t%d\t%s\t%s", tapString, ownerUsername, fileSizeInBytes, modificationTimeString, name)
+		result = append(result, fmt.Sprintf("%s\t%s\t%d\t%s\t%s", tapString, ownerUsername, fileSizeInBytes, modificationTimeString, name))
 	}
 
 	return result
