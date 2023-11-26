@@ -14,6 +14,10 @@ type DirectoryManager struct {
 	file         *os.File
 	blockSize    uint32
 	blocksOffset uint32
+
+	savedDirectory *directory.Directory
+	savedInode     *inode.Inode
+	savedPath      string
 }
 
 func NewDirectoryManager(file *os.File, blockSize, blocksOffset uint32) *DirectoryManager {
@@ -54,7 +58,21 @@ func (dm *DirectoryManager) CreateNewDirectory(inodeIndex, blockIndex uint32, pa
 	return newDir, nil
 }
 
-func (dm DirectoryManager) SaveCurrentDirectory() error {
+func (dm *DirectoryManager) SaveCurrentDirectory() error {
 	offset := dm.blocksOffset + dm.CurrentInode.Blocks[0]*dm.blockSize
 	return dm.Current.WriteAt(dm.file, offset)
+}
+
+func (dm *DirectoryManager) SaveCurrentState() {
+	dm.savedDirectory = dm.Current
+	dm.savedInode = dm.CurrentInode
+	dm.savedPath = dm.Path
+}
+
+func (dm *DirectoryManager) LoadLastState() {
+	if dm.savedDirectory != nil && dm.Path != dm.savedPath {
+		dm.Current = dm.savedDirectory
+		dm.CurrentInode = dm.savedInode
+		dm.Path = dm.savedPath
+	}
 }

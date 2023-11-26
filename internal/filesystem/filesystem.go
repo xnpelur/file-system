@@ -247,19 +247,12 @@ func (fs *FileSystem) DeleteUser(username string) error {
 }
 
 func (fs *FileSystem) ChangeOwner(path string, username string) error {
-	currDir := fs.directoryManager.Current
-	currDirInode := fs.directoryManager.CurrentInode
-	currPath := fs.directoryManager.Path
+	fs.directoryManager.SaveCurrentState()
+	defer fs.directoryManager.LoadLastState()
 
-	pathToFolder, fileName := utils.SplitPath(path)
-	if pathToFolder != "" {
-		err := fs.ChangeDirectory(pathToFolder)
-		if err != nil {
-			fs.directoryManager.Current = currDir
-			fs.directoryManager.CurrentInode = currDirInode
-			fs.directoryManager.Path = currPath
-			return err
-		}
+	fileName, err := fs.evaluatePath(path)
+	if err != nil {
+		return err
 	}
 
 	inodeIndex, err := fs.directoryManager.Current.GetInode(fileName)
@@ -284,10 +277,6 @@ func (fs *FileSystem) ChangeOwner(path string, username string) error {
 
 	fs.inodeManager.SaveInode(fileInode, inodeIndex)
 
-	fs.directoryManager.Current = currDir
-	fs.directoryManager.CurrentInode = currDirInode
-	fs.directoryManager.Path = currPath
-
 	return nil
 }
 
@@ -308,19 +297,12 @@ func (fs *FileSystem) CreateHiddenDirectory(path string) error {
 }
 
 func (fs *FileSystem) CreateEntity(path string, isFile bool, content string, hidden bool) error {
-	currDir := fs.directoryManager.Current
-	currDirInode := fs.directoryManager.CurrentInode
-	currPath := fs.directoryManager.Path
+	fs.directoryManager.SaveCurrentState()
+	defer fs.directoryManager.LoadLastState()
 
-	pathToFolder, name := utils.SplitPath(path)
-	if pathToFolder != "" {
-		err := fs.ChangeDirectory(pathToFolder)
-		if err != nil {
-			fs.directoryManager.Current = currDir
-			fs.directoryManager.CurrentInode = currDirInode
-			fs.directoryManager.Path = currPath
-			return err
-		}
+	name, err := fs.evaluatePath(path)
+	if err != nil {
+		return err
 	}
 
 	if path != "/" {
@@ -379,29 +361,20 @@ func (fs *FileSystem) CreateEntity(path string, isFile bool, content string, hid
 	if path != "/" {
 		fs.directoryManager.Current.AddFile(inodeIndex, name)
 		fs.directoryManager.SaveCurrentDirectory()
-
-		fs.directoryManager.Current = currDir
-		fs.directoryManager.CurrentInode = currDirInode
-		fs.directoryManager.Path = currPath
 	}
 
 	return nil
 }
 
 func (fs *FileSystem) DeleteFile(path string) error {
-	currDir := fs.directoryManager.Current
-	currDirInode := fs.directoryManager.CurrentInode
-	currPath := fs.directoryManager.Path
+	if strings.Contains(path, "/") {
+		fs.directoryManager.SaveCurrentState()
+		defer fs.directoryManager.LoadLastState()
+	}
 
-	pathToFolder, name := utils.SplitPath(path)
-	if pathToFolder != "" {
-		err := fs.ChangeDirectory(pathToFolder)
-		if err != nil {
-			fs.directoryManager.Current = currDir
-			fs.directoryManager.CurrentInode = currDirInode
-			fs.directoryManager.Path = currPath
-			return err
-		}
+	name, err := fs.evaluatePath(path)
+	if err != nil {
+		return err
 	}
 
 	if name == "." || name == ".." {
@@ -453,12 +426,6 @@ func (fs *FileSystem) DeleteFile(path string) error {
 	fs.blockBitmap.Save()
 	fs.inodeBitmap.Save()
 	fs.superblock.Save()
-
-	if pathToFolder != "" {
-		fs.directoryManager.Current = currDir
-		fs.directoryManager.CurrentInode = currDirInode
-		fs.directoryManager.Path = currPath
-	}
 
 	return nil
 }
@@ -535,19 +502,12 @@ func (fs FileSystem) GetCurrentDirectoryRecords(long bool) []string {
 }
 
 func (fs FileSystem) ReadFile(path string) (string, error) {
-	currDir := fs.directoryManager.Current
-	currDirInode := fs.directoryManager.CurrentInode
-	currPath := fs.directoryManager.Path
+	fs.directoryManager.SaveCurrentState()
+	defer fs.directoryManager.LoadLastState()
 
-	pathToFolder, name := utils.SplitPath(path)
-	if pathToFolder != "" {
-		err := fs.ChangeDirectory(pathToFolder)
-		if err != nil {
-			fs.directoryManager.Current = currDir
-			fs.directoryManager.CurrentInode = currDirInode
-			fs.directoryManager.Path = currPath
-			return "", err
-		}
+	name, err := fs.evaluatePath(path)
+	if err != nil {
+		return "", err
 	}
 
 	inodeIndex, err := fs.directoryManager.Current.GetInode(name)
@@ -569,27 +529,16 @@ func (fs FileSystem) ReadFile(path string) (string, error) {
 		return "", err
 	}
 
-	fs.directoryManager.Current = currDir
-	fs.directoryManager.CurrentInode = currDirInode
-	fs.directoryManager.Path = currPath
-
 	return str, nil
 }
 
 func (fs FileSystem) EditFile(path string, content string) error {
-	currDir := fs.directoryManager.Current
-	currDirInode := fs.directoryManager.CurrentInode
-	currPath := fs.directoryManager.Path
+	fs.directoryManager.SaveCurrentState()
+	defer fs.directoryManager.LoadLastState()
 
-	pathToFolder, name := utils.SplitPath(path)
-	if pathToFolder != "" {
-		err := fs.ChangeDirectory(pathToFolder)
-		if err != nil {
-			fs.directoryManager.Current = currDir
-			fs.directoryManager.CurrentInode = currDirInode
-			fs.directoryManager.Path = currPath
-			return err
-		}
+	name, err := fs.evaluatePath(path)
+	if err != nil {
+		return err
 	}
 
 	inodeIndex, err := fs.directoryManager.Current.GetInode(name)
@@ -616,10 +565,6 @@ func (fs FileSystem) EditFile(path string, content string) error {
 	fileInode.ModificationTime = uint32(time.Now().Unix())
 	fs.inodeManager.SaveInode(fileInode, inodeIndex)
 
-	fs.directoryManager.Current = currDir
-	fs.directoryManager.CurrentInode = currDirInode
-	fs.directoryManager.Path = currPath
-
 	return nil
 }
 
@@ -632,19 +577,12 @@ func (fs *FileSystem) AppendToFile(path string, content string) error {
 }
 
 func (fs *FileSystem) MoveFile(pathFrom string, pathTo string) error {
-	currDir := fs.directoryManager.Current
-	currDirInode := fs.directoryManager.CurrentInode
-	currPath := fs.directoryManager.Path
+	fs.directoryManager.SaveCurrentState()
+	defer fs.directoryManager.LoadLastState()
 
-	pathToFolderFrom, nameFrom := utils.SplitPath(pathFrom)
-	if pathToFolderFrom != "" {
-		err := fs.ChangeDirectory(pathToFolderFrom)
-		if err != nil {
-			fs.directoryManager.Current = currDir
-			fs.directoryManager.CurrentInode = currDirInode
-			fs.directoryManager.Path = currPath
-			return err
-		}
+	nameFrom, err := fs.evaluatePath(pathFrom)
+	if err != nil {
+		return err
 	}
 
 	inodeIndex, err := fs.directoryManager.Current.GetInode(nameFrom)
@@ -655,45 +593,26 @@ func (fs *FileSystem) MoveFile(pathFrom string, pathTo string) error {
 	fs.directoryManager.Current.DeleteFile(nameFrom)
 	fs.directoryManager.SaveCurrentDirectory()
 
-	fs.directoryManager.Current = currDir
-	fs.directoryManager.CurrentInode = currDirInode
-	fs.directoryManager.Path = currPath
+	fs.directoryManager.LoadLastState()
 
-	pathToFolderTo, nameTo := utils.SplitPath(pathTo)
-	if pathToFolderTo != "" {
-		err := fs.ChangeDirectory(pathToFolderTo)
-		if err != nil {
-			fs.directoryManager.Current = currDir
-			fs.directoryManager.CurrentInode = currDirInode
-			fs.directoryManager.Path = currPath
-			return err
-		}
+	nameTo, err := fs.evaluatePath(pathTo)
+	if err != nil {
+		return err
 	}
 
 	fs.directoryManager.Current.AddFile(inodeIndex, nameTo)
 	fs.directoryManager.SaveCurrentDirectory()
 
-	fs.directoryManager.Current = currDir
-	fs.directoryManager.CurrentInode = currDirInode
-	fs.directoryManager.Path = currPath
-
 	return nil
 }
 
 func (fs *FileSystem) CopyFile(pathFrom string, pathTo string) error {
-	currDir := fs.directoryManager.Current
-	currDirInode := fs.directoryManager.CurrentInode
-	currPath := fs.directoryManager.Path
+	fs.directoryManager.SaveCurrentState()
+	defer fs.directoryManager.LoadLastState()
 
-	pathToFolderFrom, nameFrom := utils.SplitPath(pathFrom)
-	if pathToFolderFrom != "" {
-		err := fs.ChangeDirectory(pathToFolderFrom)
-		if err != nil {
-			fs.directoryManager.Current = currDir
-			fs.directoryManager.CurrentInode = currDirInode
-			fs.directoryManager.Path = currPath
-			return err
-		}
+	nameFrom, err := fs.evaluatePath(pathFrom)
+	if err != nil {
+		return err
 	}
 
 	inodeIndex, err := fs.directoryManager.Current.GetInode(nameFrom)
@@ -725,23 +644,10 @@ func (fs *FileSystem) CopyFile(pathFrom string, pathTo string) error {
 		directoryRecordNames = fs.directoryManager.Current.GetRecords()
 	}
 
-	fs.directoryManager.Current = currDir
-	fs.directoryManager.CurrentInode = currDirInode
-	fs.directoryManager.Path = currPath
-
-	pathToFolderTo, nameTo := utils.SplitPath(pathTo)
-	if pathToFolderTo != "" {
-		err := fs.ChangeDirectory(pathToFolderTo)
-		if err != nil {
-			fs.directoryManager.Current = currDir
-			fs.directoryManager.CurrentInode = currDirInode
-			fs.directoryManager.Path = currPath
-			return err
-		}
-	}
+	fs.directoryManager.LoadLastState()
 
 	if fileInode.IsFile() {
-		if err = fs.CreateFileWithContent(nameTo, fileContent); err != nil {
+		if err = fs.CreateFileWithContent(pathTo, fileContent); err != nil {
 			return err
 		}
 	} else {
@@ -750,35 +656,24 @@ func (fs *FileSystem) CopyFile(pathFrom string, pathTo string) error {
 			if name == "." || name == ".." {
 				continue
 			}
-			oldPath := pathToFolderFrom + "/" + nameFrom + "/" + name
-			newPath := pathToFolderTo + "/" + nameTo + "/" + name
+			oldPath := pathFrom + "/" + name
+			newPath := pathTo + "/" + name
 			if err := fs.CopyFile(oldPath, newPath); err != nil {
 				return err
 			}
 		}
 	}
 
-	fs.directoryManager.Current = currDir
-	fs.directoryManager.CurrentInode = currDirInode
-	fs.directoryManager.Path = currPath
-
 	return nil
 }
 
 func (fs *FileSystem) ChangePermissions(path string, value int) error {
-	currDir := fs.directoryManager.Current
-	currDirInode := fs.directoryManager.CurrentInode
-	currPath := fs.directoryManager.Path
+	fs.directoryManager.SaveCurrentState()
+	defer fs.directoryManager.LoadLastState()
 
-	pathToFolder, name := utils.SplitPath(path)
-	if pathToFolder != "" {
-		err := fs.ChangeDirectory(pathToFolder)
-		if err != nil {
-			fs.directoryManager.Current = currDir
-			fs.directoryManager.CurrentInode = currDirInode
-			fs.directoryManager.Path = currPath
-			return err
-		}
+	name, err := fs.evaluatePath(path)
+	if err != nil {
+		return err
 	}
 
 	inodeIndex, err := fs.directoryManager.Current.GetInode(name)
@@ -802,10 +697,6 @@ func (fs *FileSystem) ChangePermissions(path string, value int) error {
 
 	fs.inodeManager.SaveInode(fileInode, inodeIndex)
 
-	fs.directoryManager.Current = currDir
-	fs.directoryManager.CurrentInode = currDirInode
-	fs.directoryManager.Path = currPath
-
 	return nil
 }
 
@@ -819,4 +710,15 @@ func (fs FileSystem) GetCurrentUserName() string {
 
 func (fs *FileSystem) CloseDataFile() error {
 	return fs.dataFile.Close()
+}
+
+func (fs *FileSystem) evaluatePath(path string) (string, error) {
+	pathToFolder, name := utils.SplitPath(path)
+	if pathToFolder != "" {
+		err := fs.ChangeDirectory(pathToFolder)
+		if err != nil {
+			return "", err
+		}
+	}
+	return name, nil
 }
