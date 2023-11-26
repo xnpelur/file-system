@@ -152,10 +152,17 @@ func (m *Menu) executeCommand(command string, args []string) error {
 		}
 		return m.fileSystem.DeleteFile(args[0])
 	case "list":
-		if len(args) > 1 || (len(args) > 0 && args[0] != "-l") {
-			return fmt.Errorf("%w - %s", errs.ErrUnknownArguments, args[1:])
+		var long bool
+		if len(args) > 0 {
+			if args[0] == "-l" {
+				long = true
+				if len(args) > 1 {
+					return fmt.Errorf("%w - %s", errs.ErrUnknownArguments, args[1:])
+				}
+			} else {
+				return fmt.Errorf("%w - %s", errs.ErrUnknownArguments, args)
+			}
 		}
-		long := len(args) > 0 && args[0] == "-l"
 		for _, name := range m.fileSystem.GetCurrentDirectoryRecords(long) {
 			fmt.Println(name)
 		}
