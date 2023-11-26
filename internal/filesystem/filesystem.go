@@ -72,12 +72,12 @@ func OpenFilesystem() (*FileSystem, error) {
 
 	fs.InitializeManagers()
 
-	fs.directoryManager.CurrentInode, err = fs.inodeManager.ReadInode(0)
+	rootDirInode, err := fs.inodeManager.ReadInode(0)
 	if err != nil {
 		return nil, err
 	}
 
-	if err = fs.directoryManager.OpenDirectory(fs.directoryManager.CurrentInode.Blocks[0], "/"); err != nil {
+	if err = fs.directoryManager.OpenDirectory(rootDirInode, "/"); err != nil {
 		return nil, err
 	}
 
@@ -467,16 +467,12 @@ func (fs *FileSystem) ChangeDirectory(path string) error {
 	path = strings.TrimSuffix(path, "/")
 	dirs := strings.Split(path, "/")
 
-	currDir := fs.directoryManager.Current
-	currDirInode := fs.directoryManager.CurrentInode
-	currPath := fs.directoryManager.Path
-
 	for i, dirName := range dirs {
 		var inodeIndex uint32
 		var err error
 
 		if dirName != "" {
-			inodeIndex, err = currDir.GetInode(dirName)
+			inodeIndex, err = fs.directoryManager.Current.GetInode(dirName)
 			if err != nil {
 				return err
 			}
@@ -497,23 +493,14 @@ func (fs *FileSystem) ChangeDirectory(path string) error {
 			return fmt.Errorf("%w - %s", errs.ErrRecordIsNotDirectory, dirName)
 		}
 
-		dir, err := fs.directoryManager.ReadDirectory(dirInode.Blocks[0])
-		if err != nil {
-			return err
-		}
-
-		currDir = dir
-		currDirInode = dirInode
-
 		if dirName == "" {
 			dirName = "/"
 		}
-		currPath = utils.ChangeDirectoryPath(currPath, dirName)
-	}
 
-	fs.directoryManager.Current = currDir
-	fs.directoryManager.CurrentInode = currDirInode
-	fs.directoryManager.Path = currPath
+		if err = fs.directoryManager.OpenDirectory(dirInode, dirName); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }

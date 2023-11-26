@@ -3,6 +3,7 @@ package directorymanager
 import (
 	"file-system/internal/filesystem/directory"
 	"file-system/internal/filesystem/inode"
+	"file-system/internal/utils"
 	"os"
 )
 
@@ -23,14 +24,16 @@ func NewDirectoryManager(file *os.File, blockSize, blocksOffset uint32) *Directo
 	}
 }
 
-func (dm *DirectoryManager) OpenDirectory(blockIndex uint32, path string) error {
+func (dm *DirectoryManager) OpenDirectory(dirInode *inode.Inode, name string) error {
 	var err error
+	blockIndex := dirInode.Blocks[0]
 	dirOffset := dm.blocksOffset + blockIndex*dm.blockSize
 	dm.Current, err = directory.ReadDirectoryAt(dm.file, dirOffset)
 	if err != nil {
 		return err
 	}
-	dm.Path = path
+	dm.Path = utils.ChangeDirectoryPath(dm.Path, name)
+	dm.CurrentInode = dirInode
 
 	return nil
 }
@@ -49,11 +52,6 @@ func (dm *DirectoryManager) CreateNewDirectory(inodeIndex, blockIndex uint32, pa
 	newDir.WriteAt(dm.file, dm.blocksOffset+blockIndex*dm.blockSize)
 
 	return newDir, nil
-}
-
-func (dm DirectoryManager) ReadDirectory(blockIndex uint32) (*directory.Directory, error) {
-	offset := dm.blocksOffset + blockIndex*dm.blockSize
-	return directory.ReadDirectoryAt(dm.file, offset)
 }
 
 func (dm DirectoryManager) SaveCurrentDirectory() error {
