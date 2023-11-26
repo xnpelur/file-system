@@ -3,6 +3,7 @@ package errs
 import "fmt"
 
 var ErrMissingArguments = fmt.Errorf("missing arguments")
+var ErrUnknownArguments = fmt.Errorf("unknown arguments")
 var ErrIncorrectFileName = fmt.Errorf("incorrect file name")
 var ErrUnknownCommand = fmt.Errorf("unknown command")
 var ErrRecordAlreadyExists = fmt.Errorf("record with this name already exists")

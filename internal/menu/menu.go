@@ -79,6 +79,9 @@ func (m *Menu) executeCommand(command string, args []string) error {
 		if len(args) < 1 {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
+		if len(args) > 2 {
+			return fmt.Errorf("%w - %s", errs.ErrUnknownArguments, args[2:])
+		}
 		fileName := args[0]
 
 		if strings.HasSuffix(fileName, ".") {
@@ -98,25 +101,40 @@ func (m *Menu) executeCommand(command string, args []string) error {
 		if len(args) < 2 {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
+		if len(args) > 2 {
+			return fmt.Errorf("%w - %s", errs.ErrUnknownArguments, args[2:])
+		}
 		return m.fileSystem.EditFile(args[0], args[1])
 	case "append":
 		if len(args) < 2 {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
+		}
+		if len(args) > 2 {
+			return fmt.Errorf("%w - %s", errs.ErrUnknownArguments, args[2:])
 		}
 		return m.fileSystem.AppendToFile(args[0], args[1])
 	case "move":
 		if len(args) < 2 {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
+		if len(args) > 2 {
+			return fmt.Errorf("%w - %s", errs.ErrUnknownArguments, args[2:])
+		}
 		return m.fileSystem.MoveFile(args[0], args[1])
 	case "copy":
 		if len(args) < 2 {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
+		if len(args) > 2 {
+			return fmt.Errorf("%w - %s", errs.ErrUnknownArguments, args[2:])
+		}
 		return m.fileSystem.CopyFile(args[0], args[1])
 	case "read":
 		if len(args) < 1 {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
+		}
+		if len(args) > 1 {
+			return fmt.Errorf("%w - %s", errs.ErrUnknownArguments, args[1:])
 		}
 		fileName := args[0]
 		content, err := m.fileSystem.ReadFile(fileName)
@@ -129,9 +147,14 @@ func (m *Menu) executeCommand(command string, args []string) error {
 		if len(args) < 1 {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
-		fileName := args[0]
-		return m.fileSystem.DeleteFile(fileName)
+		if len(args) > 1 {
+			return fmt.Errorf("%w - %s", errs.ErrUnknownArguments, args[1:])
+		}
+		return m.fileSystem.DeleteFile(args[0])
 	case "list":
+		if len(args) > 1 || (len(args) > 0 && args[0] != "-l") {
+			return fmt.Errorf("%w - %s", errs.ErrUnknownArguments, args[1:])
+		}
 		long := len(args) > 0 && args[0] == "-l"
 		for _, name := range m.fileSystem.GetCurrentDirectoryRecords(long) {
 			fmt.Println(name)
@@ -141,10 +164,16 @@ func (m *Menu) executeCommand(command string, args []string) error {
 		if len(args) < 1 {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
+		if len(args) > 1 {
+			return fmt.Errorf("%w - %s", errs.ErrUnknownArguments, args[1:])
+		}
 		return m.fileSystem.ChangeDirectory(args[0])
 	case "changeuser":
 		if len(args) < 2 {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
+		}
+		if len(args) > 2 {
+			return fmt.Errorf("%w - %s", errs.ErrUnknownArguments, args[2:])
 		}
 		err := m.fileSystem.ChangeUser(args[0], args[1])
 		if err != nil {
@@ -163,15 +192,24 @@ func (m *Menu) executeCommand(command string, args []string) error {
 		if len(args) < 2 {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
+		if len(args) > 2 {
+			return fmt.Errorf("%w - %s", errs.ErrUnknownArguments, args[2:])
+		}
 		return m.fileSystem.AddUser(args[0], args[1])
 	case "deleteuser":
 		if len(args) < 1 {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
+		if len(args) > 1 {
+			return fmt.Errorf("%w - %s", errs.ErrUnknownArguments, args[1:])
+		}
 		return m.fileSystem.DeleteUser(args[0])
 	case "chmod":
 		if len(args) < 1 {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
+		}
+		if len(args) > 1 {
+			return fmt.Errorf("%w - %s", errs.ErrUnknownArguments, args[1:])
 		}
 		path := args[0]
 		permissions, err := strconv.Atoi(args[1])
