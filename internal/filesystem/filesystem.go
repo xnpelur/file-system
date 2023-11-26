@@ -719,17 +719,23 @@ func (fs *FileSystem) CopyFile(pathFrom string, pathTo string) error {
 		return nil
 	}
 
-	if !fileInode.IsFile() {
-		return fmt.Errorf("not implemented yet")
-	}
-
 	if fs.userManager.Current != nil && !fileInode.HasReadPermission(*fs.userManager.Current) {
 		return fmt.Errorf("%w - copy %s", errs.ErrPermissionDenied, nameFrom)
 	}
 
-	str, err := fs.blockManager.ReadBlock(fileInode.Blocks[0], nameFrom)
-	if err != nil {
-		return err
+	var fileContent string
+	var directoryRecordNames []string
+
+	if fileInode.IsFile() {
+		fileContent, err = fs.blockManager.ReadBlock(fileInode.Blocks[0], nameFrom)
+		if err != nil {
+			return err
+		}
+	} else {
+		if err := fs.ChangeDirectory(nameFrom); err != nil {
+			return err
+		}
+		directoryRecordNames = fs.directoryManager.Current.GetRecords()
 	}
 
 	fs.directoryManager.Current = currDir
@@ -747,8 +753,22 @@ func (fs *FileSystem) CopyFile(pathFrom string, pathTo string) error {
 		}
 	}
 
-	if err = fs.CreateFileWithContent(nameTo, str); err != nil {
-		return err
+	if fileInode.IsFile() {
+		if err = fs.CreateFileWithContent(nameTo, fileContent); err != nil {
+			return err
+		}
+	} else {
+		fs.CreateDirectory(pathTo)
+		for _, name := range directoryRecordNames {
+			if name == "." || name == ".." {
+				continue
+			}
+			oldPath := pathToFolderFrom + "/" + nameFrom + "/" + name
+			newPath := pathToFolderTo + "/" + nameTo + "/" + name
+			if err := fs.CopyFile(oldPath, newPath); err != nil {
+				return err
+			}
+		}
 	}
 
 	fs.directoryManager.Current = currDir
