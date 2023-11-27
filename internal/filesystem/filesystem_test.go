@@ -148,16 +148,50 @@ func TestMoveFile(t *testing.T) {
 	fs, cleanup := setupFilesystem(t)
 	t.Cleanup(cleanup)
 
-	// TODO
-	_ = fs
+	fileContent := "Test string"
+
+	fs.CreateDirectory("dir1")
+	fs.CreateFileWithContent("dir1/file1", fileContent)
+	fs.CreateDirectory("dir2")
+
+	fs.MoveFile("dir1", "dir2/dir1")
+
+	content, _ := fs.ReadFile("dir2/dir1/file1")
+	if content != fileContent {
+		t.Errorf("MoveFile content mismatch: expected \"%s\", got \"%s\"", fileContent, content)
+	}
 }
 
-func TestCopyFile(t *testing.T) {
+func TestCopyFileSimple(t *testing.T) {
 	fs, cleanup := setupFilesystem(t)
 	t.Cleanup(cleanup)
 
-	// TODO
-	_ = fs
+	fileContent := "Test string"
+
+	fs.CreateFileWithContent("file1", fileContent)
+	fs.CopyFile("file1", "file2")
+	content, _ := fs.ReadFile("file2")
+	if content != fileContent {
+		t.Errorf("CopyFile content mismatch: expected \"%s\", got \"%s\"", fileContent, content)
+	}
+}
+
+func TestCopyFileComplex(t *testing.T) {
+	fs, cleanup := setupFilesystem(t)
+	t.Cleanup(cleanup)
+
+	fileContent := "Test string"
+
+	fs.CreateDirectory("dir1")
+	fs.CreateFileWithContent("dir1/file1", fileContent)
+	fs.CreateDirectory("dir2")
+
+	fs.CopyFile("dir1", "dir2/dir1copy")
+
+	content, _ := fs.ReadFile("dir2/dir1copy/file1")
+	if content != fileContent {
+		t.Errorf("CopyFile content mismatch: expected \"%s\", got \"%s\"", fileContent, content)
+	}
 }
 
 func TestReadLargeFile(t *testing.T) {
