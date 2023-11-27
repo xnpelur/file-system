@@ -2,9 +2,7 @@ package blockmanager
 
 import (
 	"bytes"
-	"file-system/internal/errs"
 	"file-system/internal/utils"
-	"fmt"
 	"os"
 )
 
@@ -27,12 +25,12 @@ func (bm BlockManager) ReadBlock(blockIndex uint32, name string) (string, error)
 		return "", err
 	}
 
-	nullIndex := bytes.Index(data, []byte{0})
-	if nullIndex == -1 {
-		return "", fmt.Errorf("%w - %s", errs.ErrNullNotFound, name)
+	contentEnd := bytes.Index(data, []byte{0})
+	if contentEnd == -1 {
+		contentEnd = int(bm.blockSize)
 	}
 
-	return string(data[:nullIndex]), nil
+	return string(data[:contentEnd]), nil
 }
 
 func (bm BlockManager) WriteBlock(blockIndex uint32, content string) error {

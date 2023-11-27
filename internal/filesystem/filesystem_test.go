@@ -160,6 +160,23 @@ func TestCopyFile(t *testing.T) {
 	_ = fs
 }
 
+func TestReadLargeFile(t *testing.T) {
+	fs, cleanup := setupFilesystem(t)
+	t.Cleanup(cleanup)
+
+	for blockCount := 0; blockCount < 2; blockCount++ {
+		fileContent := strings.Repeat("#", blockCount*1024)
+
+		fileName := fmt.Sprintf("test%d.txt", blockCount)
+		fs.CreateFileWithContent(fileName, fileContent)
+		content, _ := fs.ReadFile(fileName)
+
+		if content != fileContent {
+			t.Errorf("ReadFile error on %d blocks long file", blockCount)
+		}
+	}
+}
+
 func setupFilesystem(t *testing.T) (*FileSystem, func()) {
 	fs, _ := FormatFilesystem(filesystemSize, blockSize)
 
