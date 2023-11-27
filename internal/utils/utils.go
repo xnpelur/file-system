@@ -64,6 +64,9 @@ func SplitPath(input string) (string, string) {
 	if index == -1 {
 		return "", input
 	}
+	if index == 0 {
+		return "/", input[1:]
+	}
 
 	firstPart := input[:index]
 	secondPart := input[index+1:]

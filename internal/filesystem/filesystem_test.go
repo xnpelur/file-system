@@ -176,6 +176,103 @@ func TestCopyFileSimple(t *testing.T) {
 	}
 }
 
+func TestAddUser(t *testing.T) {
+	fs, cleanup := setupFilesystem(t)
+	t.Cleanup(cleanup)
+
+	username := "user"
+	password := "user"
+
+	fs.AddUser(username, password)
+
+	err := fs.ChangeDirectory("/" + username)
+	if err != nil {
+		t.Errorf("Error on user directory changing: %s", username)
+	}
+
+	content, err := fs.ReadFile(fmt.Sprintf("/.users/%s", username))
+	if err != nil || len(content) == 0 {
+		t.Errorf("Error on user file reading: %s", username)
+	}
+}
+
+func TestChangeUser(t *testing.T) {
+	fs, cleanup := setupFilesystem(t)
+	t.Cleanup(cleanup)
+
+	fs.AddUser("user1", "password")
+	fs.AddUser("user2", "password")
+
+	fs.ChangeUser("user1", "password")
+	fs.ChangeUser("user2", "password")
+	fs.ChangeUser("root", "root")
+}
+
+func TestDeleteUser(t *testing.T) {
+	fs, cleanup := setupFilesystem(t)
+	t.Cleanup(cleanup)
+
+	fs.AddUser("user", "password")
+	fs.ChangeUser("user", "password")
+	fs.ChangeUser("root", "root")
+	fs.DeleteUser("user")
+
+	err := fs.ChangeUser("user", "password")
+	if !errors.Is(err, errs.ErrRecordNotFound) {
+		t.Errorf("ChangeUser to deleted user error mismatch: expected \"%v\", got \"%v\"", errs.ErrRecordNotFound, err)
+	}
+}
+
+func TestPermissions(t *testing.T) {
+	fs, cleanup := setupFilesystem(t)
+	t.Cleanup(cleanup)
+
+	fileContent := "Test string"
+
+	fs.CreateFileWithContent("file", fileContent)
+	fs.AddUser("user", "password")
+	fs.ChangeUser("user", "password")
+
+	// ReadFile should work
+	content, _ := fs.ReadFile("/file")
+	if content != fileContent {
+		t.Errorf("ReadFile after ChangeUser content mismatch: expected \"%s\", got \"%s\"", fileContent, content)
+	}
+
+	// CreateFile should not work
+	err := fs.CreateEmptyFile("/newfile")
+	if !errors.Is(err, errs.ErrPermissionDenied) {
+		t.Errorf("CreateEmptyFile after ChangeUser error mismatch: expected \"%v\", got \"%v\"", errs.ErrPermissionDenied, err)
+	}
+}
+
+func TestChangePermissions(t *testing.T) {
+	fs, cleanup := setupFilesystem(t)
+	t.Cleanup(cleanup)
+
+	file1Content := "Test string 1"
+	file2Content := "Test string 2"
+
+	fs.CreateEmptyFile("file1")
+	fs.CreateFileWithContent("file2", file2Content)
+	fs.ChangePermissions("file1", 66)
+	fs.ChangePermissions("file2", 60)
+
+	fs.AddUser("user", "password")
+	fs.ChangeUser("user", "password")
+
+	fs.EditFile("/file1", file1Content)
+	content, _ := fs.ReadFile("/file1")
+	if content != file1Content {
+		t.Errorf("ReadFile after EditFile content mismatch: expected \"%s\", got \"%s\"", file1Content, content)
+	}
+
+	_, err := fs.ReadFile("/file2")
+	if !errors.Is(err, errs.ErrPermissionDenied) {
+		t.Errorf("ReadFile on file with 60 permissions error mismatch: expected \"%v\", got \"%v\"", errs.ErrPermissionDenied, err)
+	}
+}
+
 func TestCopyFileComplex(t *testing.T) {
 	fs, cleanup := setupFilesystem(t)
 	t.Cleanup(cleanup)

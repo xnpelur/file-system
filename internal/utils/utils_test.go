@@ -40,6 +40,7 @@ func TestSplitPath(t *testing.T) {
 	}{
 		{"/home/user/document.txt", "/home/user", "document.txt"},
 		{"dir1/dir2/file.txt", "dir1/dir2", "file.txt"},
+		{"/file", "/", "file"},
 		{"file", "", "file"},
 	}
 
