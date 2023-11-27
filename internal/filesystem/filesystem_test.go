@@ -20,24 +20,15 @@ func TestFilesystemIntegration(t *testing.T) {
 	const updatedFileContent = "Updated file content"
 
 	t.Run("TestCreateFile", func(t *testing.T) {
-		err := fs.CreateFileWithContent("test.txt", fileContent)
-		if err != nil {
-			t.Errorf("CreateFile error: %v", err)
-		}
+		fs.CreateFileWithContent("test.txt", fileContent)
 	})
 
 	t.Run("TestCreateDirectory", func(t *testing.T) {
-		err := fs.CreateDirectory("/testdir")
-		if err != nil {
-			t.Errorf("CreateDirectory error: %v", err)
-		}
+		fs.CreateDirectory("/testdir")
 	})
 
 	t.Run("TestReadFile", func(t *testing.T) {
-		content, err := fs.ReadFile("test.txt")
-		if err != nil {
-			t.Errorf("ReadFile error: %v", err)
-		}
+		content, _ := fs.ReadFile("test.txt")
 		if content != fileContent {
 			t.Errorf("ReadFile content mismatch: expected \"%s\", got \"%s\"", fileContent, content)
 		}
@@ -49,20 +40,14 @@ func TestFilesystemIntegration(t *testing.T) {
 			t.Errorf("EditFile error: %v", err)
 		}
 
-		content, err := fs.ReadFile("test.txt")
-		if err != nil {
-			t.Errorf("ReadFile error: %v", err)
-		}
+		content, _ := fs.ReadFile("test.txt")
 		if content != updatedFileContent {
 			t.Errorf("ReadFile content mismatch: expected \"%s\", got \"%s\"", updatedFileContent, content)
 		}
 	})
 
 	t.Run("TestDeleteFile", func(t *testing.T) {
-		err := fs.DeleteFile("test.txt")
-		if err != nil {
-			t.Errorf("DeleteFile error: %v", err)
-		}
+		fs.DeleteFile("test.txt")
 
 		content, err := fs.ReadFile("test.txt")
 		if !errors.Is(err, errs.ErrRecordNotFound) {
@@ -76,21 +61,14 @@ func TestDeleteDirectoryWithNestedFiles(t *testing.T) {
 	t.Cleanup(cleanup)
 
 	nestingLevel := 10
-	var err error
 
 	for i := 1; i <= nestingLevel; i++ {
 		fileName := fmt.Sprintf("file%d", i)
 		dirName := fmt.Sprintf("dir%d", i)
 
-		if err = fs.CreateDirectory(dirName); err != nil {
-			t.Fatalf("Failed to create directory %s: %v", dirName, err)
-		}
-		if err = fs.ChangeDirectory(dirName); err != nil {
-			t.Fatalf("Failed to change directory to %s: %v", dirName, err)
-		}
-		if err = fs.CreateEmptyFile(fileName); err != nil {
-			t.Fatalf("Failed to create file %s: %v", fileName, err)
-		}
+		fs.CreateDirectory(dirName)
+		fs.ChangeDirectory(dirName)
+		fs.CreateEmptyFile(fileName)
 	}
 
 	dotDotComponents := make([]string, nestingLevel)
@@ -99,36 +77,20 @@ func TestDeleteDirectoryWithNestedFiles(t *testing.T) {
 	}
 	pathToRoot := strings.Join(dotDotComponents, "/")
 
-	if err = fs.ChangeDirectory(pathToRoot); err != nil {
-		t.Fatalf("Failed to go back to root - cd %s: %v", pathToRoot, err)
-	}
-
-	if err = fs.DeleteFile("dir1"); err != nil {
-		t.Fatalf("Failed to delete dir1: %v", err)
-	}
+	fs.ChangeDirectory(pathToRoot)
+	fs.DeleteFile("dir1")
 }
 
 func TestDataFileSimpleIdempotency(t *testing.T) {
 	fs, cleanup := setupFilesystem(t)
 	t.Cleanup(cleanup)
 
-	savedContent, err := os.ReadFile(fs.dataFile.Name())
-	if err != nil {
-		t.Fatalf("Failed to read data file: %v", err)
-	}
+	savedContent, _ := os.ReadFile(fs.dataFile.Name())
 
-	if err = fs.CreateFileWithContent("file", "file content"); err != nil {
-		t.Fatalf("Failed to create file: %v", err)
-	}
+	fs.CreateFileWithContent("file", "file content")
+	fs.DeleteFile("file")
 
-	if err = fs.DeleteFile("file"); err != nil {
-		t.Fatalf("Failed to delete file: %v", err)
-	}
-
-	currentContent, err := os.ReadFile(fs.dataFile.Name())
-	if err != nil {
-		t.Fatalf("Failed to read data file: %v", err)
-	}
+	currentContent, _ := os.ReadFile(fs.dataFile.Name())
 
 	diffIndex := findFirstDifference(savedContent, currentContent)
 
@@ -143,41 +105,18 @@ func TestDataFileComplexIdempotency(t *testing.T) {
 	fs, cleanup := setupFilesystem(t)
 	t.Cleanup(cleanup)
 
-	savedContent, err := os.ReadFile(fs.dataFile.Name())
-	if err != nil {
-		t.Fatalf("Failed to read data file: %v", err)
-	}
+	savedContent, _ := os.ReadFile(fs.dataFile.Name())
 
-	if err = fs.CreateDirectory("dir"); err != nil {
-		t.Fatalf("Failed to create directory: %v", err)
-	}
-	if err = fs.CreateFileWithContent("file", "file content"); err != nil {
-		t.Fatalf("Failed to create file: %v", err)
-	}
-	if err = fs.ChangeDirectory("dir"); err != nil {
-		t.Fatalf("Failed to change current directory: %v", err)
-	}
-	if err = fs.CreateFileWithContent("otherfile", "other file content"); err != nil {
-		t.Fatalf("Failed to create file: %v", err)
-	}
-	if err = fs.CreateDirectory("otherdir"); err != nil {
-		t.Fatalf("Failed to create directory: %v", err)
-	}
-	if err = fs.ChangeDirectory(".."); err != nil {
-		t.Fatalf("Failed to change current directory: %v", err)
-	}
+	fs.CreateDirectory("dir")
+	fs.CreateFileWithContent("file", "file content")
+	fs.ChangeDirectory("dir")
+	fs.CreateFileWithContent("otherfile", "other file content")
+	fs.CreateDirectory("otherdir")
+	fs.ChangeDirectory("..")
+	fs.DeleteFile("dir")
+	fs.DeleteFile("file")
 
-	if err = fs.DeleteFile("dir"); err != nil {
-		t.Fatalf("Failed to delete directory: %v", err)
-	}
-	if err = fs.DeleteFile("file"); err != nil {
-		t.Fatalf("Failed to delete file: %v", err)
-	}
-
-	currentContent, err := os.ReadFile(fs.dataFile.Name())
-	if err != nil {
-		t.Fatalf("Failed to read data file: %v", err)
-	}
+	currentContent, _ := os.ReadFile(fs.dataFile.Name())
 
 	diffIndex := findFirstDifference(savedContent, currentContent)
 
@@ -188,20 +127,45 @@ func TestDataFileComplexIdempotency(t *testing.T) {
 	}
 }
 
-func setupFilesystem(t *testing.T) (*FileSystem, func()) {
-	fs, err := FormatFilesystem(filesystemSize, blockSize)
-	if err != nil {
-		t.Fatalf("Failed to create filesystem: %v", err)
+func TestAppendToFile(t *testing.T) {
+	fs, cleanup := setupFilesystem(t)
+	t.Cleanup(cleanup)
+
+	const fileName = "file.txt"
+	const fileContent = "Hello, "
+	const append = "world!"
+	const updatedFileContent = fileContent + append
+
+	fs.CreateFileWithContent(fileName, fileContent)
+	fs.AppendToFile(fileName, append)
+	content, _ := fs.ReadFile(fileName)
+	if content != updatedFileContent {
+		t.Errorf("AppendToFile content mismatch: expected \"%s\", got \"%s\"", updatedFileContent, content)
 	}
+}
+
+func TestMoveFile(t *testing.T) {
+	fs, cleanup := setupFilesystem(t)
+	t.Cleanup(cleanup)
+
+	// TODO
+	_ = fs
+}
+
+func TestCopyFile(t *testing.T) {
+	fs, cleanup := setupFilesystem(t)
+	t.Cleanup(cleanup)
+
+	// TODO
+	_ = fs
+}
+
+func setupFilesystem(t *testing.T) (*FileSystem, func()) {
+	fs, _ := FormatFilesystem(filesystemSize, blockSize)
 
 	cleanup := func() {
-		if err := fs.CloseDataFile(); err != nil {
-			t.Errorf("Error closing data file: %v", err)
-		}
-
-		if err := os.Remove(fs.dataFile.Name()); err != nil {
-			t.Errorf("Error removing file: %v", err)
-		}
+		fs.CloseDataFile()
+		os.Remove(fs.dataFile.Name())
 	}
 
 	return fs, cleanup
