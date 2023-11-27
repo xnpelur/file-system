@@ -18,11 +18,19 @@ import (
 )
 
 type Config struct {
-	FileName string
+	FileName     string
+	FileSize     uint32
+	BlockSize    uint32
+	RootUsername string
+	RootPassword string
 }
 
-var FilesystemConfig = Config{
-	FileName: "filesystem.data",
+var FSConfig = Config{
+	FileName:     "filesystem.data",
+	FileSize:     1 * 1024 * 1024,
+	BlockSize:    1024,
+	RootUsername: "root",
+	RootPassword: "root",
 }
 
 type FileSystem struct {
@@ -40,7 +48,7 @@ func OpenFilesystem() (*FileSystem, error) {
 	fs := FileSystem{}
 
 	var err error
-	fs.dataFile, err = os.OpenFile(FilesystemConfig.FileName, os.O_RDWR, 0666)
+	fs.dataFile, err = os.OpenFile(FSConfig.FileName, os.O_RDWR, 0666)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +89,7 @@ func OpenFilesystem() (*FileSystem, error) {
 		return nil, err
 	}
 
-	if err = fs.ChangeUser("root", "root"); err != nil {
+	if err = fs.ChangeUser(FSConfig.RootUsername, FSConfig.RootPassword); err != nil {
 		return nil, err
 	}
 
@@ -96,7 +104,7 @@ func FormatFilesystem(sizeInBytes uint32, blockSize uint32) (*FileSystem, error)
 	fs := FileSystem{}
 
 	var err error
-	fs.dataFile, err = os.Create(FilesystemConfig.FileName)
+	fs.dataFile, err = os.Create(FSConfig.FileName)
 	if err != nil {
 		return nil, err
 	}
@@ -123,10 +131,10 @@ func FormatFilesystem(sizeInBytes uint32, blockSize uint32) (*FileSystem, error)
 	if err := fs.CreateHiddenDirectory(".users"); err != nil {
 		return nil, err
 	}
-	if err := fs.AddUser("root", "root"); err != nil {
+	if err := fs.AddUser(FSConfig.RootUsername, FSConfig.RootPassword); err != nil {
 		return nil, err
 	}
-	if err := fs.ChangeUser("root", "root"); err != nil {
+	if err := fs.ChangeUser(FSConfig.RootUsername, FSConfig.RootPassword); err != nil {
 		return nil, err
 	}
 
@@ -209,7 +217,7 @@ func (fs *FileSystem) ChangeUser(username, password string) error {
 	fs.ChangeDirectory("/")
 	fs.userManager.Current = u
 
-	if username != "root" {
+	if u.UserId != 0 {
 		userDirPath := fmt.Sprintf("/%s", username)
 		if err := fs.ChangeDirectory(userDirPath); err != nil {
 			return err

@@ -24,10 +24,10 @@ func (m Menu) Start() {
 	var err error
 	m.fileSystem, err = filesystem.OpenFilesystem()
 	if err != nil {
-		fmt.Printf("Не удалось открыть файловую систему из файла %s\n", filesystem.FilesystemConfig.FileName)
+		fmt.Printf("Не удалось открыть файловую систему из файла %s\n", filesystem.FSConfig.FileName)
 		ans := getYesOrNo("Форматировать новую файловую систему (все данные будут потеряны)? (y/n): ")
 		if ans {
-			m.fileSystem, err = filesystem.FormatFilesystem(1*1024*1024, 1024) // 1Mb - filesystem, 1kb - block
+			m.fileSystem, err = filesystem.FormatFilesystem(filesystem.FSConfig.FileSize, filesystem.FSConfig.BlockSize)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -58,7 +58,7 @@ func (m Menu) Start() {
 		} else if parts[0] == "format" {
 			ans := getYesOrNo("Вы уверены, что хотите форматировать файловую систему (все данные будут потеряны)? (y/n): ")
 			if ans {
-				m.fileSystem, err = filesystem.FormatFilesystem(1*1024*1024, 1024)
+				m.fileSystem, err = filesystem.FormatFilesystem(filesystem.FSConfig.FileSize, filesystem.FSConfig.BlockSize)
 				if err != nil {
 					log.Fatal(err)
 				}

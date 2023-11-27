@@ -9,9 +9,6 @@ import (
 	"testing"
 )
 
-const filesystemSize = 1024 * 1024
-const blockSize = 1024
-
 func TestFilesystemIntegration(t *testing.T) {
 	fs, cleanup := setupFilesystem(t)
 	t.Cleanup(cleanup)
@@ -205,7 +202,7 @@ func TestChangeUser(t *testing.T) {
 
 	fs.ChangeUser("user1", "password")
 	fs.ChangeUser("user2", "password")
-	fs.ChangeUser("root", "root")
+	fs.ChangeUser(FSConfig.RootUsername, FSConfig.RootPassword)
 }
 
 func TestDeleteUser(t *testing.T) {
@@ -214,7 +211,7 @@ func TestDeleteUser(t *testing.T) {
 
 	fs.AddUser("user", "password")
 	fs.ChangeUser("user", "password")
-	fs.ChangeUser("root", "root")
+	fs.ChangeUser(FSConfig.RootUsername, FSConfig.RootPassword)
 	fs.DeleteUser("user")
 
 	err := fs.ChangeUser("user", "password")
@@ -296,7 +293,7 @@ func TestReadLargeFile(t *testing.T) {
 	t.Cleanup(cleanup)
 
 	for blockCount := 0; blockCount < 2; blockCount++ {
-		fileContent := strings.Repeat("#", blockCount*1024)
+		fileContent := strings.Repeat("#", blockCount*int(FSConfig.BlockSize))
 
 		fileName := fmt.Sprintf("test%d.txt", blockCount)
 		fs.CreateFileWithContent(fileName, fileContent)
@@ -309,7 +306,7 @@ func TestReadLargeFile(t *testing.T) {
 }
 
 func setupFilesystem(t *testing.T) (*FileSystem, func()) {
-	fs, _ := FormatFilesystem(filesystemSize, blockSize)
+	fs, _ := FormatFilesystem(FSConfig.FileSize, FSConfig.BlockSize)
 
 	cleanup := func() {
 		fs.CloseDataFile()
