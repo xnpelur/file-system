@@ -323,11 +323,15 @@ func (fs *FileSystem) CreateEntity(path string, isFile bool, content string, hid
 		}
 	}
 
-	blockIndex, err := fs.blockBitmap.TakeFreeBit()
-	if err != nil {
-		return err
+	blockCount := (len(content)-1)/int(fs.superblock.BlockSize) + 1
+	blockIndeces := make([]uint32, blockCount)
+	for i := 0; i < blockCount; i++ {
+		blockIndeces[i], err = fs.blockBitmap.TakeFreeBit()
+		if err != nil {
+			return err
+		}
+		fs.superblock.FreeBlockCount--
 	}
-	fs.superblock.FreeBlockCount--
 
 	inodeIndex, err := fs.inodeBitmap.TakeFreeBit()
 	if err != nil {
@@ -344,7 +348,7 @@ func (fs *FileSystem) CreateEntity(path string, isFile bool, content string, hid
 		userId = fs.userManager.Current.UserId
 	}
 
-	fileInode, err := inode.NewInode(isFile, hidden, 64, userId, []uint32{blockIndex})
+	fileInode, err := inode.NewInode(isFile, hidden, 64, userId, blockIndeces)
 	if err != nil {
 		return err
 	}
@@ -353,13 +357,13 @@ func (fs *FileSystem) CreateEntity(path string, isFile bool, content string, hid
 
 	if isFile {
 		if len(content) > 0 {
-			err := fs.blockManager.WriteBlock(blockIndex, content)
+			err := fs.blockManager.WriteBlocks(fileInode, content)
 			if err != nil {
 				return err
 			}
 		}
 	} else {
-		newDir, _ := fs.directoryManager.CreateNewDirectory(inodeIndex, blockIndex, path)
+		newDir, _ := fs.directoryManager.CreateNewDirectory(inodeIndex, blockIndeces[0], path)
 		if path == "/" {
 			fs.directoryManager.Current = newDir
 			fs.directoryManager.CurrentInode, _ = fs.inodeManager.ReadInode(inodeIndex)
@@ -425,8 +429,8 @@ func (fs *FileSystem) DeleteFile(path string) error {
 	fs.superblock.FreeBlockCount++
 	fs.superblock.FreeInodeCount++
 
-	fs.blockManager.ResetBlock(fileInode.Blocks[0])
-	fs.blockManager.ResetBlock(fs.directoryManager.CurrentInode.Blocks[0])
+	fs.blockManager.ResetBlocks(fileInode)
+	fs.blockManager.ResetBlocks(fs.directoryManager.CurrentInode)
 	fs.inodeManager.ResetInode(inodeIndex)
 
 	fs.directoryManager.SaveCurrentDirectory()
@@ -532,7 +536,7 @@ func (fs FileSystem) ReadFile(path string) (string, error) {
 		return "", fmt.Errorf("%w - read %s", errs.ErrPermissionDenied, name)
 	}
 
-	str, err := fs.blockManager.ReadBlock(fileInode.Blocks[0], name)
+	str, err := fs.blockManager.ReadBlocks(fileInode, name)
 	if err != nil {
 		return "", err
 	}
@@ -567,8 +571,8 @@ func (fs FileSystem) EditFile(path string, content string) error {
 		return fmt.Errorf("%w - %s", errs.ErrRecordIsNotFile, name)
 	}
 
-	fs.blockManager.ResetBlock(fileInode.Blocks[0])
-	fs.blockManager.WriteBlock(fileInode.Blocks[0], content)
+	fs.blockManager.ResetBlocks(fileInode)
+	fs.blockManager.WriteBlocks(fileInode, content)
 
 	fileInode.ModificationTime = uint32(time.Now().Unix())
 	fs.inodeManager.SaveInode(fileInode, inodeIndex)
@@ -641,7 +645,7 @@ func (fs *FileSystem) CopyFile(pathFrom string, pathTo string) error {
 	var directoryRecordNames []string
 
 	if fileInode.IsFile() {
-		fileContent, err = fs.blockManager.ReadBlock(fileInode.Blocks[0], nameFrom)
+		fileContent, err = fs.blockManager.ReadBlocks(fileInode, nameFrom)
 		if err != nil {
 			return err
 		}

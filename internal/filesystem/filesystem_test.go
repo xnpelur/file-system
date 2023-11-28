@@ -292,7 +292,7 @@ func TestReadLargeFile(t *testing.T) {
 	fs, cleanup := setupFilesystem(t)
 	t.Cleanup(cleanup)
 
-	for blockCount := 0; blockCount < 2; blockCount++ {
+	for blockCount := 0; blockCount < 10; blockCount++ {
 		fileContent := strings.Repeat("#", blockCount*int(FSConfig.BlockSize))
 
 		fileName := fmt.Sprintf("test%d.txt", blockCount)
