@@ -572,6 +572,30 @@ func (fs FileSystem) EditFile(path string, content string) error {
 	}
 
 	fs.blockManager.ResetBlocks(fileInode)
+
+	newFileSize := (len(content)-1)/int(fs.superblock.BlockSize) + 1
+	oldFileSize := int(fileInode.FileSize)
+	if newFileSize > oldFileSize {
+		for i := oldFileSize; i < newFileSize; i++ {
+			fileInode.Blocks[i], err = fs.blockBitmap.TakeFreeBit()
+			if err != nil {
+				return err
+			}
+			fs.superblock.FreeBlockCount--
+		}
+
+	} else if newFileSize < oldFileSize {
+		for i := newFileSize; i < oldFileSize; i++ {
+			err := fs.blockBitmap.SetBit(fileInode.Blocks[i], 0)
+			if err != nil {
+				return err
+			}
+			fileInode.Blocks[i] = 0
+			fs.superblock.FreeBlockCount++
+		}
+	}
+	fileInode.FileSize = uint32(newFileSize)
+
 	fs.blockManager.WriteBlocks(fileInode, content)
 
 	fileInode.ModificationTime = uint32(time.Now().Unix())

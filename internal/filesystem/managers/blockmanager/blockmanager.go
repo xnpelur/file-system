@@ -44,8 +44,6 @@ func (bm BlockManager) ReadBlocks(fileInode *inode.Inode, name string) (string, 
 }
 
 func (bm BlockManager) WriteBlocks(fileInode *inode.Inode, content string) error {
-	// data := utils.StringToByteBlock(content, bm.blockSize)
-
 	for i := 0; i < int(fileInode.FileSize); i++ {
 		blockIndex := fileInode.Blocks[i]
 		offset := bm.blocksOffset + blockIndex*bm.blockSize
