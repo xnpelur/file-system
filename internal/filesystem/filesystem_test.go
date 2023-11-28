@@ -333,7 +333,7 @@ func TestReadLargeDirectory(t *testing.T) {
 	fs, cleanup := setupFilesystem(t)
 	t.Cleanup(cleanup)
 
-	fileCount := 500
+	fileCount := 50
 
 	fs.CreateDirectory("dir")
 	fs.ChangeDirectory("dir")

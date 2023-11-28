@@ -2,7 +2,6 @@ package record
 
 import (
 	"encoding/binary"
-	"os"
 )
 
 type Record struct {
@@ -23,18 +22,7 @@ func NewRecord(inode uint32, name string) Record {
 	return recordInstance
 }
 
-func (r Record) WriteAt(file *os.File, offset uint32) error {
-	data := r.encode()
-
-	_, err := file.WriteAt(data, int64(offset))
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (value Record) encode() []byte {
+func (value Record) Encode() []byte {
 	data := make([]byte, value.RecordLength)
 
 	binary.BigEndian.PutUint32(data[0:4], value.Inode)

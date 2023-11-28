@@ -5,8 +5,6 @@ import (
 	"file-system/internal/errs"
 	"file-system/internal/filesystem/directory/record"
 	"fmt"
-	"io"
-	"os"
 )
 
 type Directory struct {
@@ -28,48 +26,32 @@ func NewDirectory(inode uint32, parentInode uint32) *Directory {
 	}
 }
 
-func ReadDirectoryAt(file *os.File, offset uint32) (*Directory, error) {
+func ReadDirectoryFromBytes(data []byte) (*Directory, error) {
 	directory := Directory{
 		records: make(map[string]record.Record),
 	}
+	offset := 0
 	for {
-		inodeData := make([]byte, 4)
-		_, err := file.ReadAt(inodeData, int64(offset))
-		if err != nil {
-			if err == io.EOF {
-				break // End of directory
-			}
-			return &directory, err
+		if len(data) < offset+4 {
+			break
 		}
+		inodeData := data[offset : offset+4]
 		inode := binary.BigEndian.Uint32(inodeData)
 		offset += 4
 
-		recordLengthData := make([]byte, 2)
-		_, err = file.ReadAt(recordLengthData, int64(offset))
-		if err != nil {
-			return &directory, err
-		}
+		recordLengthData := data[offset : offset+2]
 		recordLength := binary.BigEndian.Uint16(recordLengthData)
 		if recordLength == 0 {
 			break // Empty record was read
 		}
 		offset += 2
 
-		nameLengthData := make([]byte, 1)
-		_, err = file.ReadAt(nameLengthData, int64(offset))
-		if err != nil {
-			return &directory, err
-		}
-		nameLength := nameLengthData[0]
+		nameLength := data[offset]
 		offset += 1
 
-		nameData := make([]byte, nameLength)
-		_, err = file.ReadAt(nameData, int64(offset))
-		if err != nil {
-			return &directory, err
-		}
+		nameData := data[offset : offset+int(nameLength)]
 		name := string(nameData)
-		offset += uint32(nameLength)
+		offset += int(nameLength)
 
 		record := record.Record{
 			Inode:        inode,
@@ -102,16 +84,13 @@ func (d *Directory) DeleteFile(name string) {
 	d.keys = newKeys
 }
 
-func (d Directory) WriteAt(file *os.File, offset uint32) error {
+func (d Directory) Encode() []byte {
+	data := make([]byte, 0)
 	for _, key := range d.keys {
-		rec := d.records[key]
-		err := rec.WriteAt(file, offset)
-		if err != nil {
-			return err
-		}
-		offset += uint32(rec.RecordLength)
+		bytes := d.records[key].Encode()
+		data = append(data, bytes...)
 	}
-	return nil
+	return data
 }
 
 func (d Directory) GetRecords() []string {

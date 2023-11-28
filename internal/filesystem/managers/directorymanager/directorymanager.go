@@ -30,9 +30,21 @@ func NewDirectoryManager(file *os.File, blockSize, blocksOffset uint32) *Directo
 
 func (dm *DirectoryManager) OpenDirectory(dirInode *inode.Inode, name string) error {
 	var err error
-	blockIndex := dirInode.Blocks[0]
-	dirOffset := dm.blocksOffset + blockIndex*dm.blockSize
-	dm.Current, err = directory.ReadDirectoryAt(dm.file, dirOffset)
+	data := make([]byte, 0)
+
+	for i := 0; i < int(dirInode.FileSize); i++ {
+		blockIndex := dirInode.Blocks[i]
+		dirOffset := dm.blocksOffset + blockIndex*dm.blockSize
+
+		tmpData := make([]byte, dm.blockSize)
+		_, err = dm.file.ReadAt(tmpData, int64(dirOffset))
+		if err != nil {
+			return err
+		}
+		data = append(data, tmpData...)
+	}
+
+	dm.Current, err = directory.ReadDirectoryFromBytes(data)
 	if err != nil {
 		return err
 	}
@@ -42,25 +54,24 @@ func (dm *DirectoryManager) OpenDirectory(dirInode *inode.Inode, name string) er
 	return nil
 }
 
-func (dm *DirectoryManager) CreateNewDirectory(inodeIndex, blockIndex uint32, path string) (*directory.Directory, error) {
+func (dm *DirectoryManager) CreateNewDirectory(dirInode *inode.Inode, inodeIndex uint32) (*directory.Directory, error) {
 	var currDirInodeIndex uint32
 	var err error
 
-	if path != "/" {
+	if inodeIndex != 0 {
 		currDirInodeIndex, err = dm.Current.GetInode(".")
 		if err != nil {
 			return nil, err
 		}
 	}
 	newDir := directory.NewDirectory(inodeIndex, currDirInodeIndex)
-	newDir.WriteAt(dm.file, dm.blocksOffset+blockIndex*dm.blockSize)
+	dm.saveDirectory(newDir, dirInode)
 
 	return newDir, nil
 }
 
 func (dm *DirectoryManager) SaveCurrentDirectory() error {
-	offset := dm.blocksOffset + dm.CurrentInode.Blocks[0]*dm.blockSize
-	return dm.Current.WriteAt(dm.file, offset)
+	return dm.saveDirectory(dm.Current, dm.CurrentInode)
 }
 
 func (dm *DirectoryManager) SaveCurrentState() {
@@ -75,4 +86,40 @@ func (dm *DirectoryManager) LoadLastState() {
 		dm.CurrentInode = dm.savedInode
 		dm.Path = dm.savedPath
 	}
+}
+
+func (dm *DirectoryManager) saveDirectory(dir *directory.Directory, dirInode *inode.Inode) error {
+	data := dir.Encode()
+	data = fitInBlocks(data, dm.blockSize)
+
+	for i := 0; i < int(dirInode.FileSize); i++ {
+		offset := dm.blocksOffset + dirInode.Blocks[i]*dm.blockSize
+
+		sliceStart := int(dm.blockSize) * i
+		sliceEnd := int(dm.blockSize) * (i + 1)
+		if sliceEnd > len(data) {
+			sliceEnd = len(data)
+		}
+
+		_, err := dm.file.WriteAt(data[sliceStart:sliceEnd], int64(offset))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func fitInBlocks(data []byte, blockSize uint32) []byte {
+	currentSize := uint32(len(data))
+	remainder := currentSize % blockSize
+
+	if remainder == 0 {
+		return data
+	}
+
+	padding := make([]byte, blockSize-remainder)
+	newData := append(data, padding...)
+
+	return newData
 }

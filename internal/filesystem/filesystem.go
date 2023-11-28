@@ -363,10 +363,10 @@ func (fs *FileSystem) CreateEntity(path string, isFile bool, content string, hid
 			}
 		}
 	} else {
-		newDir, _ := fs.directoryManager.CreateNewDirectory(inodeIndex, blockIndeces[0], path)
+		newDir, _ := fs.directoryManager.CreateNewDirectory(fileInode, inodeIndex)
 		if path == "/" {
 			fs.directoryManager.Current = newDir
-			fs.directoryManager.CurrentInode, _ = fs.inodeManager.ReadInode(inodeIndex)
+			fs.directoryManager.CurrentInode = fileInode
 		}
 	}
 
@@ -432,7 +432,6 @@ func (fs *FileSystem) DeleteFile(path string) error {
 	fs.superblock.FreeInodeCount++
 
 	fs.blockManager.ResetBlocks(fileInode)
-	fs.blockManager.ResetBlocks(fs.directoryManager.CurrentInode)
 	fs.inodeManager.ResetInode(inodeIndex)
 
 	fs.directoryManager.SaveCurrentDirectory()
