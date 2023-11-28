@@ -423,10 +423,12 @@ func (fs *FileSystem) DeleteFile(path string) error {
 
 	fs.directoryManager.Current.DeleteFile(name)
 
-	fs.blockBitmap.SetBit(fileInode.Blocks[0], 0)
-	fs.inodeBitmap.SetBit(inodeIndex, 0)
+	for i := 0; i < int(fileInode.FileSize); i++ {
+		fs.blockBitmap.SetBit(fileInode.Blocks[i], 0)
+		fs.superblock.FreeBlockCount++
+	}
 
-	fs.superblock.FreeBlockCount++
+	fs.inodeBitmap.SetBit(inodeIndex, 0)
 	fs.superblock.FreeInodeCount++
 
 	fs.blockManager.ResetBlocks(fileInode)

@@ -305,6 +305,54 @@ func TestReadLargeFile(t *testing.T) {
 	}
 }
 
+func TestDataFileIdempotencyWithLargeFile(t *testing.T) {
+	fs, cleanup := setupFilesystem(t)
+	t.Cleanup(cleanup)
+
+	savedContent, _ := os.ReadFile(fs.dataFile.Name())
+
+	blockCount := 10
+	fileContent := strings.Repeat("#", blockCount*int(FSConfig.BlockSize))
+
+	fileName := fmt.Sprintf("test%d.txt", blockCount)
+	fs.CreateFileWithContent(fileName, fileContent)
+	fs.DeleteFile(fileName)
+
+	currentContent, _ := os.ReadFile(fs.dataFile.Name())
+
+	diffIndex := findFirstDifference(savedContent, currentContent)
+
+	if diffIndex != -1 {
+		expectedByte := savedContent[diffIndex]
+		gotByte := currentContent[diffIndex]
+		t.Errorf("File content mismatch at byte index %d. Expected: %x, Got: %x", diffIndex, expectedByte, gotByte)
+	}
+}
+
+func TestReadLargeDirectory(t *testing.T) {
+	fs, cleanup := setupFilesystem(t)
+	t.Cleanup(cleanup)
+
+	fileCount := 500
+
+	fs.CreateDirectory("dir")
+	fs.ChangeDirectory("dir")
+	for i := 0; i < fileCount; i++ {
+		if i == 1019 {
+			fmt.Print("hi")
+		}
+		fs.CreateEmptyFile(fmt.Sprintf("file%d", i))
+	}
+	fs.ChangeDirectory("..")
+	fs.ChangeDirectory("dir")
+
+	currentRecords := fs.GetCurrentDirectoryRecords(false)
+	currentFileCount := len(currentRecords) - 2
+	if currentFileCount != fileCount {
+		t.Errorf("Directory records count mismatch: expected %d, got %d", fileCount, currentFileCount)
+	}
+}
+
 func setupFilesystem(t *testing.T) (*FileSystem, func()) {
 	fs, _ := FormatFilesystem(FSConfig.FileSize, FSConfig.BlockSize)
 
