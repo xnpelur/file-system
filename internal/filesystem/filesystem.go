@@ -28,7 +28,7 @@ type Config struct {
 var FSConfig = Config{
 	FileName:     "filesystem.data",
 	FileSize:     1 * 1024 * 1024,
-	BlockSize:    256,
+	BlockSize:    1024,
 	RootUsername: "root",
 	RootPassword: "root",
 }

@@ -338,9 +338,6 @@ func TestReadLargeDirectory(t *testing.T) {
 	fs.CreateDirectory("dir")
 	fs.ChangeDirectory("dir")
 	for i := 0; i < fileCount; i++ {
-		if i == 1019 {
-			fmt.Print("hi")
-		}
 		fs.CreateEmptyFile(fmt.Sprintf("file%d", i))
 	}
 	fs.ChangeDirectory("..")

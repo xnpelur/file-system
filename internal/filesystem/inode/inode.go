@@ -79,7 +79,7 @@ func ReadInodeAt(file *os.File, offset uint32) (*Inode, error) {
 		return nil, err
 	}
 
-	data := make([]byte, 65)
+	data := make([]byte, GetInodeSize())
 	_, err = file.Read(data)
 	if err != nil {
 		return nil, err
@@ -171,7 +171,7 @@ func (inode Inode) WriteAt(file *os.File, offset uint32) error {
 }
 
 func (inode Inode) encode() []byte {
-	data := make([]byte, 65)
+	data := make([]byte, GetInodeSize())
 
 	data[0] = inode.TypeAndPermissions
 	binary.BigEndian.PutUint16(data[1:3], inode.UserId)
