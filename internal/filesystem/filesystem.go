@@ -437,6 +437,8 @@ func (fs *FileSystem) DeleteFile(path string) error {
 	fs.blockManager.ResetBlocks(fileInode)
 	fs.inodeManager.ResetInode(inodeIndex)
 
+	fs.RevalidateFileSize(fs.directoryManager.CurrentInode, len(fs.directoryManager.Current.Encode()))
+	fs.inodeManager.SaveInode(fs.directoryManager.CurrentInode, fs.directoryManager.CurrentInodeIndex)
 	fs.directoryManager.SaveCurrentDirectory()
 
 	fs.blockBitmap.Save()
@@ -634,6 +636,8 @@ func (fs *FileSystem) MoveFile(pathFrom string, pathTo string) error {
 	}
 
 	fs.directoryManager.Current.DeleteFile(nameFrom)
+	fs.RevalidateFileSize(fs.directoryManager.CurrentInode, len(fs.directoryManager.Current.Encode()))
+	fs.inodeManager.SaveInode(fs.directoryManager.CurrentInode, fs.directoryManager.CurrentInodeIndex)
 	fs.directoryManager.SaveCurrentDirectory()
 
 	fs.directoryManager.LoadLastState()
@@ -644,6 +648,8 @@ func (fs *FileSystem) MoveFile(pathFrom string, pathTo string) error {
 	}
 
 	fs.directoryManager.Current.AddFile(inodeIndex, nameTo)
+	fs.RevalidateFileSize(fs.directoryManager.CurrentInode, len(fs.directoryManager.Current.Encode()))
+	fs.inodeManager.SaveInode(fs.directoryManager.CurrentInode, fs.directoryManager.CurrentInodeIndex)
 	fs.directoryManager.SaveCurrentDirectory()
 
 	return nil
