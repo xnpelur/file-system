@@ -28,7 +28,7 @@ type Config struct {
 var FSConfig = Config{
 	FileName:     "filesystem.data",
 	FileSize:     1 * 1024 * 1024,
-	BlockSize:    1024,
+	BlockSize:    256,
 	RootUsername: "root",
 	RootPassword: "root",
 }
@@ -85,7 +85,7 @@ func OpenFilesystem() (*FileSystem, error) {
 		return nil, err
 	}
 
-	if err = fs.directoryManager.OpenDirectory(rootDirInode, "/"); err != nil {
+	if err = fs.directoryManager.OpenDirectory(rootDirInode, 0, "/"); err != nil {
 		return nil, err
 	}
 
@@ -367,11 +367,14 @@ func (fs *FileSystem) CreateEntity(path string, isFile bool, content string, hid
 		if path == "/" {
 			fs.directoryManager.Current = newDir
 			fs.directoryManager.CurrentInode = fileInode
+			fs.directoryManager.CurrentInodeIndex = inodeIndex
 		}
 	}
 
 	if path != "/" {
 		fs.directoryManager.Current.AddFile(inodeIndex, name)
+		fs.RevalidateFileSize(fs.directoryManager.CurrentInode, len(fs.directoryManager.Current.Encode()))
+		fs.inodeManager.SaveInode(fs.directoryManager.CurrentInode, fs.directoryManager.CurrentInodeIndex)
 		fs.directoryManager.SaveCurrentDirectory()
 	}
 
@@ -477,7 +480,7 @@ func (fs *FileSystem) ChangeDirectory(path string) error {
 			dirName = "/"
 		}
 
-		if err = fs.directoryManager.OpenDirectory(dirInode, dirName); err != nil {
+		if err = fs.directoryManager.OpenDirectory(dirInode, inodeIndex, dirName); err != nil {
 			return err
 		}
 	}
@@ -573,8 +576,18 @@ func (fs FileSystem) EditFile(path string, content string) error {
 	}
 
 	fs.blockManager.ResetBlocks(fileInode)
+	fs.RevalidateFileSize(fileInode, len(content))
+	fs.blockManager.WriteBlocks(fileInode, content)
 
-	newFileSize := (len(content)-1)/int(fs.superblock.BlockSize) + 1
+	fileInode.ModificationTime = uint32(time.Now().Unix())
+	fs.inodeManager.SaveInode(fileInode, inodeIndex)
+
+	return nil
+}
+
+func (fs *FileSystem) RevalidateFileSize(fileInode *inode.Inode, contentSize int) error {
+	var err error
+	newFileSize := (contentSize-1)/int(fs.superblock.BlockSize) + 1
 	oldFileSize := int(fileInode.FileSize)
 	if newFileSize > oldFileSize {
 		for i := oldFileSize; i < newFileSize; i++ {
@@ -584,7 +597,6 @@ func (fs FileSystem) EditFile(path string, content string) error {
 			}
 			fs.superblock.FreeBlockCount--
 		}
-
 	} else if newFileSize < oldFileSize {
 		for i := newFileSize; i < oldFileSize; i++ {
 			err := fs.blockBitmap.SetBit(fileInode.Blocks[i], 0)
@@ -596,12 +608,6 @@ func (fs FileSystem) EditFile(path string, content string) error {
 		}
 	}
 	fileInode.FileSize = uint32(newFileSize)
-
-	fs.blockManager.WriteBlocks(fileInode, content)
-
-	fileInode.ModificationTime = uint32(time.Now().Unix())
-	fs.inodeManager.SaveInode(fileInode, inodeIndex)
-
 	return nil
 }
 

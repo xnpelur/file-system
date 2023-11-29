@@ -8,16 +8,19 @@ import (
 )
 
 type DirectoryManager struct {
-	Current      *directory.Directory
-	CurrentInode *inode.Inode
-	Path         string
+	Current           *directory.Directory
+	CurrentInode      *inode.Inode
+	CurrentInodeIndex uint32
+	Path              string
+
 	file         *os.File
 	blockSize    uint32
 	blocksOffset uint32
 
-	savedDirectory *directory.Directory
-	savedInode     *inode.Inode
-	savedPath      string
+	savedDirectory  *directory.Directory
+	savedInode      *inode.Inode
+	savedInodeIndex uint32
+	savedPath       string
 }
 
 func NewDirectoryManager(file *os.File, blockSize, blocksOffset uint32) *DirectoryManager {
@@ -28,7 +31,7 @@ func NewDirectoryManager(file *os.File, blockSize, blocksOffset uint32) *Directo
 	}
 }
 
-func (dm *DirectoryManager) OpenDirectory(dirInode *inode.Inode, name string) error {
+func (dm *DirectoryManager) OpenDirectory(dirInode *inode.Inode, inodeIndex uint32, name string) error {
 	var err error
 	data := make([]byte, 0)
 
@@ -50,6 +53,7 @@ func (dm *DirectoryManager) OpenDirectory(dirInode *inode.Inode, name string) er
 	}
 	dm.Path = utils.ChangeDirectoryPath(dm.Path, name)
 	dm.CurrentInode = dirInode
+	dm.CurrentInodeIndex = inodeIndex
 
 	return nil
 }
@@ -77,6 +81,7 @@ func (dm *DirectoryManager) SaveCurrentDirectory() error {
 func (dm *DirectoryManager) SaveCurrentState() {
 	dm.savedDirectory = dm.Current
 	dm.savedInode = dm.CurrentInode
+	dm.savedInodeIndex = dm.CurrentInodeIndex
 	dm.savedPath = dm.Path
 }
 
@@ -84,6 +89,7 @@ func (dm *DirectoryManager) LoadLastState() {
 	if dm.savedDirectory != nil && dm.Path != dm.savedPath {
 		dm.Current = dm.savedDirectory
 		dm.CurrentInode = dm.savedInode
+		dm.CurrentInodeIndex = dm.savedInodeIndex
 		dm.Path = dm.savedPath
 	}
 }
@@ -113,10 +119,6 @@ func (dm *DirectoryManager) saveDirectory(dir *directory.Directory, dirInode *in
 func fitInBlocks(data []byte, blockSize uint32) []byte {
 	currentSize := uint32(len(data))
 	remainder := currentSize % blockSize
-
-	if remainder == 0 {
-		return data
-	}
 
 	padding := make([]byte, blockSize-remainder)
 	newData := append(data, padding...)
