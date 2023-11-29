@@ -374,6 +374,7 @@ func (fs *FileSystem) CreateEntity(path string, isFile bool, content string, hid
 	if path != "/" {
 		fs.directoryManager.Current.AddFile(inodeIndex, name)
 		fs.RevalidateFileSize(fs.directoryManager.CurrentInode, len(fs.directoryManager.Current.Encode()))
+		fs.directoryManager.CurrentInode.ModificationTime = uint32(time.Now().Unix())
 		fs.inodeManager.SaveInode(fs.directoryManager.CurrentInode, fs.directoryManager.CurrentInodeIndex)
 		fs.directoryManager.SaveCurrentDirectory()
 	}
@@ -438,6 +439,7 @@ func (fs *FileSystem) DeleteFile(path string) error {
 	fs.inodeManager.ResetInode(inodeIndex)
 
 	fs.RevalidateFileSize(fs.directoryManager.CurrentInode, len(fs.directoryManager.Current.Encode()))
+	fs.directoryManager.CurrentInode.ModificationTime = uint32(time.Now().Unix())
 	fs.inodeManager.SaveInode(fs.directoryManager.CurrentInode, fs.directoryManager.CurrentInodeIndex)
 	fs.directoryManager.SaveCurrentDirectory()
 
@@ -637,6 +639,7 @@ func (fs *FileSystem) MoveFile(pathFrom string, pathTo string) error {
 
 	fs.directoryManager.Current.DeleteFile(nameFrom)
 	fs.RevalidateFileSize(fs.directoryManager.CurrentInode, len(fs.directoryManager.Current.Encode()))
+	fs.directoryManager.CurrentInode.ModificationTime = uint32(time.Now().Unix())
 	fs.inodeManager.SaveInode(fs.directoryManager.CurrentInode, fs.directoryManager.CurrentInodeIndex)
 	fs.directoryManager.SaveCurrentDirectory()
 
@@ -649,6 +652,7 @@ func (fs *FileSystem) MoveFile(pathFrom string, pathTo string) error {
 
 	fs.directoryManager.Current.AddFile(inodeIndex, nameTo)
 	fs.RevalidateFileSize(fs.directoryManager.CurrentInode, len(fs.directoryManager.Current.Encode()))
+	fs.directoryManager.CurrentInode.ModificationTime = uint32(time.Now().Unix())
 	fs.inodeManager.SaveInode(fs.directoryManager.CurrentInode, fs.directoryManager.CurrentInodeIndex)
 	fs.directoryManager.SaveCurrentDirectory()
 
