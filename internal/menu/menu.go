@@ -215,7 +215,7 @@ func (m *Menu) executeCommand(command string, args []string) error {
 		if len(args) < 1 {
 			return fmt.Errorf("%w - %s", errs.ErrMissingArguments, command)
 		}
-		if len(args) > 1 {
+		if len(args) > 2 {
 			return fmt.Errorf("%w - %s", errs.ErrUnknownArguments, args[1:])
 		}
 		path := args[0]
