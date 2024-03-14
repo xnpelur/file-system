@@ -224,6 +224,25 @@ func (m *Menu) executeCommand(command string, args []string) error {
 			return err
 		}
 		return m.fileSystem.ChangePermissions(path, permissions)
+	case "help":
+		fmt.Println()
+		fmt.Println("Список доступных команд:")
+		fmt.Println()
+		fmt.Println("format - Форматировать файловую систему")
+		fmt.Println("create <filename> <content> - Создает новый файл с указанным именем и содержимым (опционально).")
+		fmt.Println("edit <filepath> <content> - Меняет содержимое файла по указанному пути на заданное.")
+		fmt.Println("append <filename> <content> - Добавляет содержимое в конец файла.")
+		fmt.Println("move <from> <to> - Перемещает файл или директорию.")
+		fmt.Println("copy <from> <to> - Копирует файл или директорию.")
+		fmt.Println("read <filepath> - Выводит содержимое указанного файла.")
+		fmt.Println("delete <filepath> - Удаляет указанный файл.")
+		fmt.Println("list <-l> - Выводит список файлов и директорий в текущей директории (-l - длинный формат).")
+		fmt.Println("changeuser <username> <password> - Сменяет текущего пользователя на указанного.")
+		fmt.Println("adduser <username> <password> - Добавляет нового пользователя с указанным именем и паролем.")
+		fmt.Println("deleteuser <username> - Удаляет указанного пользователя (только для root).")
+		fmt.Println("chmod <path> <value> - Изменяет права доступа к указанному файлу в соответствии с указанным значением.")
+		fmt.Println()
+		return nil;
 	default:
 		return fmt.Errorf("%w - %s", errs.ErrUnknownCommand, command)
 	}
